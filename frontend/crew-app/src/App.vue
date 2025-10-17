@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue';
+// import HelloWorld from './components/HelloWorld.vue';
+import AlertSettings from './components/AlertSettings.vue';
 </script>
 
 <template>
-	<div>
+	<!-- <div>
 		<h1>Testing from home page! :)</h1>
-	</div>
-	<HelloWorld />
+	</div> -->
+	<!-- <HelloWorld /> -->
+	<AlertSettings />
 </template>
 
 <style scoped></style>
