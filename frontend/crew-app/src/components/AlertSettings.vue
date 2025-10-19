@@ -850,7 +850,7 @@ function addSelectedCustomerLocations() {
 
 async function handleSubmit() {
 	try {
-		const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
+		const { error: signInError } = await supabase.auth.signInWithPassword({
 			email: import.meta.env.VITE_TEST_USER_EMAIL,
 			password: import.meta.env.VITE_TEST_USER_PASSWORD,
 		});

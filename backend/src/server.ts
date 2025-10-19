@@ -85,6 +85,22 @@ app.delete('/api/delivery-alert-setting/:id', async (req, res) => {
 	res.sendStatus(200);
 });
 
+app.get('/api/delivery-alert-setting/:id', async (req, res) => {
+	try {
+		const { id } = req.params;
+		const { data, error } = await supabase
+			.from('delivery_alert_settings')
+			.select('*')
+			.eq('delivery_alert_setting_id', id)
+			.single();
+		if (error) return res.status(400).json({ error: error.message });
+		return res.status(200).json(data);
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: 'Server error' });
+	}
+});
+
 app.patch('/api/delivery-alert-setting/:id', async (req, res) => {
 	//TODO: User check
 	const { id } = req.params;
