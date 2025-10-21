@@ -263,6 +263,19 @@ export class CreateDeliveryAlertSettings {
 		}
 	}
 
+	removeAlertFromSystem(alertSettingId: AlertSettingId): void {
+		if (this.activeAlerts.has(alertSettingId)) {
+			this.activeAlerts.delete(alertSettingId);
+		}
+		if (this.forToday.has(alertSettingId)) {
+			this.forToday.delete(alertSettingId);
+		}
+		if (this.forThisHour.has(alertSettingId)) {
+			this.forThisHour.delete(alertSettingId);
+		}
+		this.removeFromSchedule(alertSettingId);
+	}
+
 	clearAll(): void {
 		this.forToday.clear();
 		this.forThisHour.clear();

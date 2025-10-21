@@ -7,6 +7,9 @@ import type { User } from '@supabase/supabase-js';
 import { CreateDeliveryAlertSettings } from './alertSettingsLogic.js';
 dotenv.config();
 
+//TODO: Implement user checks in all requests (delete needs extra role logic)
+//TODO: validateData(payload) - Zod ?
+
 declare global {
 	namespace Express {
 		interface Request {
@@ -15,12 +18,13 @@ declare global {
 	}
 }
 
+export const delAlertSettingsHandler = new CreateDeliveryAlertSettings();
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(
 	cors({
-		origin: 'http://localhost:5173', // frontend origin
+		origin: 'http://localhost:5173',
 		methods: ['GET', 'POST', 'OPTIONS'],
 		allowedHeaders: ['Content-Type', 'Authorization'],
 	}),
@@ -41,7 +45,7 @@ async function verifyUser(req: Request, res: Response, next: NextFunction) {
 		if (error || !user) {
 			return res.status(401).json({ error: 'Invalid or expired token' });
 		}
-		req.user = user; // attach user info to request
+		req.user = user;
 		next();
 	} catch (err) {
 		console.error(err);
@@ -49,40 +53,90 @@ async function verifyUser(req: Request, res: Response, next: NextFunction) {
 	}
 }
 
-app.post('/api/delivery-alert-setting/add', verifyUser, async (req: Request, res: Response) => {
-	const alertSetting = req.body;
-	const user = req.user;
-	//const isAdmin = user.app_metadata?.role === 'admin';
-	const { data, error } = await supabase
-		.from('delivery_alert_settings')
-		.upsert({
-			description: alertSetting.description,
-			vehicles: alertSetting.vehicles,
-			type: alertSetting.type,
-			active_hours: alertSetting.active_hours,
-			receivers: alertSetting.receivers,
-			alert_interval_minutes: alertSetting.alert_interval_minutes,
-			active_dates: alertSetting.active_dates,
-			status: 'active',
-			trigger_values: alertSetting.trigger_values,
-		})
-		.select()
-		.single();
-	if (!data) return;
-	const delAlertSetting = new CreateDeliveryAlertSettings();
-	delAlertSetting.sortBy(data, ['hasActiveDates', 'isActiveToday', 'isActiveThisHour']);
-	delAlertSetting.forThisHour.forEach((alertId) => delAlertSetting.addToSchedule(alertId));
-	res.status(200).json({ ok: true });
+app.post('/api/delivery-alert-setting/add', async (req: Request, res: Response) => {
+	try {
+		const alertSetting = req.body;
+		const user = req.user;
+		//const isAdmin = user.app_metadata?.role === 'admin';
+		const { data, error } = await supabase
+			.from('delivery_alert_settings')
+			.upsert({
+				description: alertSetting.description,
+				vehicles: alertSetting.vehicles,
+				type: alertSetting.type,
+				active_hours: alertSetting.active_hours,
+				receivers: alertSetting.receivers,
+				alert_interval_minutes: alertSetting.alert_interval_minutes,
+				active_dates: alertSetting.active_dates,
+				status: 'active',
+				trigger_values: alertSetting.trigger_values,
+			})
+			.select()
+			.single();
+		if (error) return res.status(400).json({ error: error.message });
+		await delAlertSettingsHandler.sortBy(data, [
+			'hasActiveDates',
+			'isActiveToday',
+			'isActiveThisHour',
+		]);
+		delAlertSettingsHandler.forThisHour.forEach(
+			async (alertId) => await delAlertSettingsHandler.addToSchedule(alertId),
+		);
+		res.status(201).json({ ok: true });
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ error: 'Server error' });
+	}
+});
+
+app.patch('/api/delivery-alert-setting/:id', async (req, res) => {
+	try {
+		const { id } = req.params;
+		const payload = req.body;
+
+		const { data, error } = await supabase
+			.from('delivery_alert_settings')
+			.update(payload)
+			.eq('delivery_alert_setting_id', id)
+			.select()
+			.single();
+
+		//TODO: How to know if we need to call add to schedule here?
+		const delAlertSettingId = data.delivery_alert_setting_id;
+		delAlertSettingsHandler.removeAlertFromSystem(delAlertSettingId);
+		await delAlertSettingsHandler.sortBy(delAlertSettingId, [
+			'hasActiveDates',
+			'isActiveToday',
+			'isActiveThisHour',
+		]);
+
+		if (error) return res.status(400).json({ error: error.message });
+		res.json(data);
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ error: 'Server error' });
+	}
 });
 
 app.delete('/api/delivery-alert-setting/:id', async (req, res) => {
-	const { id } = req.params;
-	const { error } = await supabase
-		.from('delivery_alert_settings')
-		.delete()
-		.eq('delivery_alert_setting_id', id);
-	if (error) return res.status(400).json({ error: error.message });
-	res.sendStatus(200);
+	try {
+		const { id } = req.params;
+		const { data, error } = await supabase
+			.from('delivery_alert_settings')
+			.delete()
+			.eq('delivery_alert_setting_id', id)
+			.select();
+		if (error) return res.status(400).json({ error: error.message });
+
+		if (data.length) {
+			const delAlertSettingId = data[0].delivery_alert_setting_id;
+			delAlertSettingsHandler.removeAlertFromSystem(delAlertSettingId);
+		}
+		res.sendStatus(204);
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ error: 'Server error' });
+	}
 });
 
 app.get('/api/delivery-alert-setting/:id', async (req, res) => {
@@ -95,33 +149,10 @@ app.get('/api/delivery-alert-setting/:id', async (req, res) => {
 			.single();
 		if (error) return res.status(400).json({ error: error.message });
 		return res.status(200).json(data);
-	} catch (err) {
-		console.error(err);
+	} catch (error) {
+		console.error(error);
 		res.status(500).json({ error: 'Server error' });
 	}
-});
-
-app.patch('/api/delivery-alert-setting/:id', async (req, res) => {
-	//TODO: User check
-	const { id } = req.params;
-	const payload = req.body;
-	//TODO: validateData(payload)
-
-	//Which fields are we allowed to edit?
-	const { data, error } = await supabase
-		.from('delivery_alert_settings')
-		.update(payload)
-		.eq('delivery_alert_setting_id', id)
-		.select()
-		.single();
-
-	if (error) return res.status(400).json({ error: error.message });
-	const delAlertSetting = new CreateDeliveryAlertSettings();
-	delAlertSetting.sortBy(data, ['hasActiveDates', 'isActiveToday', 'isActiveThisHour']);
-	delAlertSetting.forThisHour.forEach((alertId) => delAlertSetting.addToSchedule(alertId));
-
-	//TODO: Call class logic here: If an alert setting is edited, remove it from all queues and revalidate
-	res.json(data);
 });
 
 app.listen(Number(PORT), '0.0.0.0', () => {
