@@ -838,17 +838,17 @@ function addSelectedCustomerLocations() {
 
 async function handleSubmit() {
 	try {
-		const { error: signInError } = await supabase.auth.signInWithPassword({
-			email: import.meta.env.VITE_TEST_USER_EMAIL,
-			password: import.meta.env.VITE_TEST_USER_PASSWORD,
+		const tokenResponse = await fetch('http://localhost:8080/api/auth/test-login', {
+			method: 'POST', // stays POST for security and semantics
+			headers: { 'Content-Type': 'application/json' },
 		});
 
-		const {
-			data: { session },
-		} = await supabase.auth.getSession();
-		const accessToken = session?.access_token;
+		if (!tokenResponse.ok) {
+			throw new Error('Failed to fetch test login token');
+		}
 
-		if (signInError) throw signInError;
+		const { access_token } = await tokenResponse.json();
+		if (!access_token) throw new Error('No access token returned');
 		const formattedReceivers = form.receivers.map((r) => ({
 			receiverName: r.receiverName,
 			phoneNumber: r.phoneNumber || null,
@@ -884,7 +884,7 @@ async function handleSubmit() {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				Authorization: `Bearer ${accessToken}`,
+				Authorization: `Bearer ${access_token}`,
 			},
 			body: JSON.stringify(alertSettingToAdd),
 		});
