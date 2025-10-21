@@ -838,7 +838,7 @@ function addSelectedCustomerLocations() {
 
 async function handleSubmit() {
 	try {
-		const tokenResponse = await fetch('http://localhost:8080/api/auth/test-login', {
+		const tokenResponse = await fetch('http://13.60.98.248:8080/api/auth/test-login', {
 			method: 'POST', // stays POST for security and semantics
 			headers: { 'Content-Type': 'application/json' },
 		});
@@ -880,7 +880,7 @@ async function handleSubmit() {
 			created_at: null,
 		};
 		console.log('Alert setting to send to BE: ', alertSettingToAdd);
-		const response = await fetch('http://localhost:8080/api/delivery-alert-setting/add', {
+		const response = await fetch('http://13.60.98.248:8080/api/delivery-alert-setting/add', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
