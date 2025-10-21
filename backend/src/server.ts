@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { supabase } from './supabase.js';
-import type { User } from '@supabase/supabase-js';
+import { createClient, type User } from '@supabase/supabase-js';
 import { CreateDeliveryAlertSettings } from './alertSettingsLogic.js';
 dotenv.config();
 
@@ -31,16 +31,18 @@ app.use(
 );
 
 app.use(express.json());
-
+const supabaseAuth = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 async function verifyUser(req: Request, res: Response, next: NextFunction) {
-	try {
-		const token = req.headers.authorization?.replace('Bearer ', '');
-		if (!token) return res.status(401).json({ error: 'Missing authorization token' });
+	const token = req.headers.authorization?.replace('Bearer ', '');
+	if (!token) {
+		return res.status(401).json({ error: 'Missing authorization token' });
+	}
 
+	try {
 		const {
 			data: { user },
 			error,
-		} = await supabase.auth.getUser(token);
+		} = await supabaseAuth.auth.getUser(token);
 
 		if (error || !user) {
 			return res.status(401).json({ error: 'Invalid or expired token' });
@@ -49,11 +51,27 @@ async function verifyUser(req: Request, res: Response, next: NextFunction) {
 		next();
 	} catch (err) {
 		console.error(err);
-		res.status(500).json({ error: 'Internal server error' });
+		res.status(401).json({ error: 'Invalid or expired token' });
 	}
 }
 
-app.post('/api/delivery-alert-setting/add', async (req: Request, res: Response) => {
+app.post('/api/auth/test-login', async (req: Request, res: Response) => {
+	try {
+		const { data, error } = await supabaseAuth.auth.signInWithPassword({
+			email: process.env.TEST_USER_EMAIL!,
+			password: process.env.TEST_USER_PASSWORD!,
+		});
+
+		if (error) throw error;
+
+		res.json({ access_token: data.session?.access_token });
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: 'Failed to create test session' });
+	}
+});
+
+app.post('/api/delivery-alert-setting/add', verifyUser, async (req: Request, res: Response) => {
 	try {
 		const alertSetting = req.body;
 		const user = req.user;
@@ -89,7 +107,7 @@ app.post('/api/delivery-alert-setting/add', async (req: Request, res: Response) 
 	}
 });
 
-app.patch('/api/delivery-alert-setting/:id', async (req, res) => {
+app.patch('/api/delivery-alert-setting/:id', async (req: Request, res: Response) => {
 	try {
 		const { id } = req.params;
 		const payload = req.body;
@@ -118,7 +136,7 @@ app.patch('/api/delivery-alert-setting/:id', async (req, res) => {
 	}
 });
 
-app.delete('/api/delivery-alert-setting/:id', async (req, res) => {
+app.delete('/api/delivery-alert-setting/:id', async (req: Request, res: Response) => {
 	try {
 		const { id } = req.params;
 		const { data, error } = await supabase
@@ -139,7 +157,7 @@ app.delete('/api/delivery-alert-setting/:id', async (req, res) => {
 	}
 });
 
-app.get('/api/delivery-alert-setting/:id', async (req, res) => {
+app.get('/api/delivery-alert-setting/:id', async (req: Request, res: Response) => {
 	try {
 		const { id } = req.params;
 		const { data, error } = await supabase
