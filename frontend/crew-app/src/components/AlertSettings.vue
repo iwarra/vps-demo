@@ -516,18 +516,6 @@
 				</div>
 			</div>
 
-			<!-- Save all receivers -->
-			<div
-				v-if="form.receivers.length"
-				class="save-section">
-				<button
-					type="button"
-					class="btn btn-save"
-					@click="saveReceivers">
-					Save Receiver(s)
-				</button>
-			</div>
-
 			<div style="display: block; margin-top: 1rem"></div>
 			<button
 				@click="handleSubmit"
@@ -961,12 +949,6 @@ function addReceiver() {
 
 function removeReceiver(index: number) {
 	form.receivers.splice(index, 1);
-}
-
-//TODO remove and check that the rest works
-function saveReceivers() {
-	console.log('Receivers saved:', form.receivers);
-	alert('Receivers saved successfully!');
 }
 
 // Date ranges
