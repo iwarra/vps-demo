@@ -1,11 +1,13 @@
-import type { Receiver, Alert, DeliveryAlertLog } from '../types';
-import { supabase } from '../supabase.js';
+import type { Receiver, Alert, DeliveryAlertLog } from '../types.ts';
+import { supabase } from '../supabase.ts';
 
 export async function createAlertLog(
 	alertSetting: Alert,
 	metricTrigger: number,
+	alertType: string,
 ): Promise<DeliveryAlertLog | null> {
 	try {
+		console.log('In create alert log with this data: ', alertSetting, metricTrigger, alertType);
 		const { data, error } = await supabase
 			.from('delivery_alert_logs')
 			.upsert({
@@ -13,14 +15,15 @@ export async function createAlertLog(
 					? alertSetting.vehicles[0]
 					: '9180b59b-7bc1-41b6-b6f5-bdee830c1ba2',
 				receivers: alertSetting.receivers,
-				alert_type: alertSetting.type,
+				alert_type: alertSetting.type === 'temperature' ? alertType : alertSetting.type,
 				delivery_alert_setting_id: alertSetting.delivery_alert_setting_id,
 				metric_value: Math.round(metricTrigger),
 			})
 			.select();
 
 		if (error) throw error;
-		return data?.[0] ?? null;
+		console.log('The created log: ', data[0]);
+		return data?.[0];
 	} catch (err) {
 		console.error('Failed creating alert log:', err);
 		return null;

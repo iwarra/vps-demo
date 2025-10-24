@@ -1,11 +1,11 @@
-import { supabase } from './supabase.js';
+import { supabase } from './supabase.ts';
 import dotenv from 'dotenv';
-import type { Alert, Validator, AlertSettingId, DeliveryAlertLog } from './types';
+import type { Alert, Validator, AlertSettingId, DeliveryAlertLog } from './types.ts';
 import {
 	createAlertLog,
 	fetchLatestTemperature,
 	separateContacts,
-} from './utils/deliveryAlertSetting.js';
+} from './utils/deliveryAlertSetting.ts';
 dotenv.config();
 
 export class CreateDeliveryAlertSettings {
@@ -30,20 +30,21 @@ export class CreateDeliveryAlertSettings {
 		}
 	}
 
-	async isAlreadyAlerted(alertSetting: Alert): Promise<boolean> {
+	async isAlreadyAlerted(alertSetting: Alert, alertLogType: string): Promise<boolean> {
 		try {
 			const { data, error } = await supabase
 				.from('delivery_alert_logs')
-				.select('delivery_alert_log_id, sent_at, sent')
+				.select('delivery_alert_log_id, sent_at, sent, alert_type')
 				.eq('delivery_alert_setting_id', alertSetting.delivery_alert_setting_id)
-				.eq('alert_type', alertSetting.type)
 				.eq('sent', true)
 				.order('sent_at', { ascending: false }) //latest sent alert
 				.limit(1);
 
+			console.log(data);
 			if (error) throw error;
 			if (!data || data.length === 0) return false;
-			return true;
+			if (data[0].alert_type === alertLogType) return true;
+			else return false;
 		} catch (error) {
 			console.error('Failed checking alert history:', error);
 			return false; // Fail-safe: treat as not alerted to allow retry
@@ -87,7 +88,7 @@ export class CreateDeliveryAlertSettings {
 			//Sending SMS alerts can be added to promise later on
 			//TODO add proper params here
 			const results = await Promise.allSettled(
-				emails.map((email) => this.sendEmailAlert(email, 'subject', 'email text')),
+				emails.map((email: string) => this.sendEmailAlert(email, 'subject', 'email text')),
 			);
 			const failures: (PromiseFulfilledResult<{ ok: boolean }> | PromiseRejectedResult)[] =
 				results.filter(
@@ -107,43 +108,45 @@ export class CreateDeliveryAlertSettings {
 		let alertLog: DeliveryAlertLog | null = null; // rewrite supabase data after sending to DB - useful to have for sending alert info
 		let alertTriggered = false;
 		const { type, trigger_values: condition } = alertSetting;
+		let alertLogType = '';
 
-		const checkTemperature = async (
-			type: string,
-			condition: { min?: number; max?: number } | null,
-		) => {
+		console.log('The alert setting type: ', type);
+		const checkTemperature = async (condition: { min?: number; max?: number } | null) => {
 			const temperature = await fetchLatestTemperature();
 			let triggered = false;
-			if (!temperature || !condition || !type) return false;
-			if (type === 'low_temperature' && condition.min != null && temperature < condition.min) {
+			if (!temperature || !condition) return false;
+			console.log('Starting the handler with this condition: ', condition);
+			if (condition.min && temperature < condition.min) {
+				alertLogType = 'low_temperature';
+				console.log('Setting min_temp: ', alertLogType, condition.min);
 				triggered = true;
-			} else if (
-				type === 'high_temperature' &&
-				condition.max != null &&
-				temperature > condition.max
-			) {
+			} else if (condition.max && temperature > condition.max) {
+				alertLogType = 'high_temperature';
+				console.log('Setting max_temp: ', alertLogType, condition.max);
 				triggered = true;
 			} else {
 				triggered = false;
 				return false;
 			}
 			if (triggered) {
-				alertLog = await createAlertLog(alertSetting, temperature);
+				alertLog = await createAlertLog(alertSetting, temperature, alertLogType);
 				alertLogCreated = true;
 			}
 			return triggered;
 		};
 		try {
-			if (type === 'low_temperature' || type === 'high_temperature') {
-				alertTriggered = await checkTemperature(type, {
+			if (type === 'temperature') {
+				alertTriggered = await checkTemperature({
 					min: condition.min ?? undefined,
 					max: condition.max ?? undefined,
 				});
+				console.log('Trigger check for temp type: ', alertTriggered, ' for ', alertLogType);
 			}
 			if (!alertTriggered) return;
 
 			if (alertLogCreated && alertTriggered) {
-				const alreadyAlerted = await this.isAlreadyAlerted(alertSetting);
+				const alreadyAlerted = await this.isAlreadyAlerted(alertSetting, alertLogType);
+				console.log('Is it already alerted: ', alreadyAlerted);
 				if (!alreadyAlerted) {
 					await this.sendAlert(alertSetting);
 					await this.markAlertAsSent(alertSetting.delivery_alert_setting_id);
@@ -154,21 +157,20 @@ export class CreateDeliveryAlertSettings {
 		}
 	}
 
-	async sortBy(setting: Alert, conditions: Validator[]): Promise<void> {
+	async sortBy(setting: Alert, conditions: Validator[]): Promise<boolean> {
+		if (typeof setting !== 'object') return false;
 		for (const condition of conditions) {
 			if (condition == 'hasActiveDates') {
 				const now = new Date();
 				// Normalize hours to local midnight to avoid timezone issues
 				now.setHours(0, 0, 0, 0);
 				const hasActiveDates = (setting.active_dates ?? []).some((range) => {
+					if (!range?.to) return false;
 					const to = new Date(range.to);
-					if (!to) return false;
 					to.setHours(0, 0, 0, 0);
 					return !isNaN(to.getTime()) && to >= now;
 				});
-				if (hasActiveDates) {
-					this.activeAlerts.set(setting.delivery_alert_setting_id, setting);
-				} else {
+				if (!hasActiveDates) {
 					//mark the alert as expired in DB
 					try {
 						const { error } = await supabase
@@ -180,27 +182,35 @@ export class CreateDeliveryAlertSettings {
 					} catch (err) {
 						console.error('Unexpected error while marking expired:', err);
 					}
+					return false;
 				}
+				this.activeAlerts.set(setting.delivery_alert_setting_id, setting);
 			} else if (condition === 'isActiveToday') {
 				const today = new Date();
 				today.setHours(0, 0, 0, 0);
-				if (setting.active_dates) {
-					const isActiveToday = setting.active_dates.some((range) => {
+				const isActiveToday = (setting.active_dates ?? []).some(
+					(range: { from: string; to: string }) => {
+						if (!range?.from || !range?.to) return false;
 						const fromDate = new Date(range.from);
 						const toDate = new Date(range.to);
 						fromDate.setHours(0, 0, 0, 0);
 						toDate.setHours(0, 0, 0, 0);
-						return fromDate <= today && toDate >= today;
-					});
-					if (isActiveToday) {
-						this.forToday.add(setting.delivery_alert_setting_id);
-					}
-				}
+						return (
+							!isNaN(fromDate.getTime()) &&
+							!isNaN(toDate.getTime()) &&
+							fromDate <= today &&
+							toDate >= today
+						);
+					},
+				);
+				if (!isActiveToday) return false;
+				this.forToday.add(setting.delivery_alert_setting_id);
 			} else if (condition === 'isActiveThisHour') {
 				const now = new Date();
 				const currentHour = now.getHours();
+
 				const transformTimeRangesToHours = (alertHourRanges: { from: string; to: string }[]) => {
-					const hours = new Set();
+					const hours = new Set<number>();
 
 					alertHourRanges.forEach((range) => {
 						const [fromHour, fromMinute] = range.from.split(':').map(Number);
@@ -220,16 +230,14 @@ export class CreateDeliveryAlertSettings {
 					});
 					return hours;
 				};
-
-				const checkForCurrentHour = (alertHourRanges: { to: string; from: string }[]): boolean => {
-					const allActiveHours = transformTimeRangesToHours(alertHourRanges).has(currentHour);
-					return allActiveHours;
-				};
-				if (setting.active_hours && checkForCurrentHour(setting.active_hours)) {
-					this.forThisHour.add(setting.delivery_alert_setting_id);
-				}
+				const isActiveAtCurrentHour = setting.active_hours
+					? transformTimeRangesToHours(setting.active_hours).has(currentHour)
+					: false;
+				if (!isActiveAtCurrentHour) return false;
+				this.forThisHour.add(setting.delivery_alert_setting_id);
 			}
 		}
+		return true;
 	}
 
 	async addToSchedule(alertSettingId: AlertSettingId): Promise<void> {
@@ -283,14 +291,16 @@ export class CreateDeliveryAlertSettings {
 		this.scheduled.clear();
 	}
 
-	//TODO: set as private?
+	//TODO: set as private
 	async fetchActiveDeliveryAlertSettings(): Promise<Alert[]> {
 		try {
 			const { data, error } = await supabase
 				.from('delivery_alert_settings')
 				.select('*')
-				.eq('status', 'active');
+				.eq('status', 'active')
+				.or('is_deleted.is.null,is_deleted.eq.false');
 			if (error) throw error;
+			console.log('Data: ', data);
 			return data as Alert[];
 		} catch (error) {
 			console.error('Error fetching alert settings:', error);
@@ -299,26 +309,23 @@ export class CreateDeliveryAlertSettings {
 	}
 
 	async rebuild(): Promise<void> {
-		//TODO: create a helper
-		for (const alertSettingId of this.scheduled.keys()) {
-			this.removeFromSchedule(alertSettingId);
-		}
+		//Clears the system, fetches active, processes and schedules
+		await this.clearSchedule();
 		this.forThisHour.clear();
 		this.forToday.clear();
 		this.activeAlerts.clear();
+
 		const allActiveAlerts = await this.fetchActiveDeliveryAlertSettings();
-		for (const alert of allActiveAlerts) {
-			await this.sortBy(alert, ['hasActiveDates', 'isActiveToday', 'isActiveThisHour']);
-		}
-		for (const alertId of this.forThisHour) {
-			await this.addToSchedule(alertId);
-		}
+		await this.processAlerts(allActiveAlerts, [
+			'hasActiveDates',
+			'isActiveToday',
+			'isActiveThisHour',
+		]);
+		await this.scheduleForThisHour();
 	}
 
 	async rebuildForThisHour(): Promise<void> {
-		for (const alertSettingId of this.scheduled.keys()) {
-			this.removeFromSchedule(alertSettingId);
-		}
+		await this.clearSchedule();
 
 		for (const alertId of this.forToday) {
 			const alert = this.activeAlerts.get(alertId);
@@ -327,8 +334,25 @@ export class CreateDeliveryAlertSettings {
 			}
 		}
 
+		await this.scheduleForThisHour();
+	}
+
+	// helpers:
+	async clearSchedule(): Promise<void> {
+		for (const alertSettingId of this.scheduled.keys()) {
+			this.removeFromSchedule(alertSettingId);
+		}
+	}
+
+	async scheduleForThisHour(): Promise<void> {
 		for (const alertId of this.forThisHour) {
 			await this.addToSchedule(alertId);
+		}
+	}
+
+	async processAlerts(alerts: Alert[], sortingCriteria: Validator[]): Promise<void> {
+		for (const alert of alerts) {
+			await this.sortBy(alert, sortingCriteria);
 		}
 	}
 }
