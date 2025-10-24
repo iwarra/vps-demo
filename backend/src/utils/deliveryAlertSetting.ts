@@ -1,11 +1,13 @@
-import type { Receiver, Alert, DeliveryAlertLog } from '../types.ts';
+import type { Receiver, DelAlertSetting } from '../types.ts';
 import { supabase } from '../supabase.ts';
+import { Database, Json } from '../../database.types.ts';
+type AlertLog = Database['public']['Tables']['delivery_alert_logs']['Row'];
 
 export async function createAlertLog(
-	alertSetting: Alert,
+	alertSetting: DelAlertSetting,
 	metricTrigger: number,
 	alertType: string,
-): Promise<DeliveryAlertLog | null> {
+): Promise<AlertLog | null> {
 	try {
 		console.log('In create alert log with this data: ', alertSetting, metricTrigger, alertType);
 		const { data, error } = await supabase
@@ -14,7 +16,7 @@ export async function createAlertLog(
 				vehicle_id: alertSetting.vehicles
 					? alertSetting.vehicles[0]
 					: '9180b59b-7bc1-41b6-b6f5-bdee830c1ba2',
-				receivers: alertSetting.receivers,
+				receivers: alertSetting.receivers as unknown as Json,
 				alert_type: alertSetting.type === 'temperature' ? alertType : alertSetting.type,
 				delivery_alert_setting_id: alertSetting.delivery_alert_setting_id,
 				metric_value: Math.round(metricTrigger),
@@ -23,6 +25,7 @@ export async function createAlertLog(
 
 		if (error) throw error;
 		console.log('The created log: ', data[0]);
+		//TODO: Handle error so alert isn't sent on every trigger
 		return data?.[0];
 	} catch (err) {
 		console.error('Failed creating alert log:', err);
@@ -59,4 +62,17 @@ export function separateContacts(deliveryAlertReceivers: Receiver[]) {
 	}
 
 	return { emails, phoneNumbers };
+}
+
+export function normalizeDeliveryAlertSetting(
+	row: Database['public']['Tables']['delivery_alert_settings']['Row'],
+): DelAlertSetting {
+	return {
+		...row,
+		receivers: (row.receivers as Receiver[] | null) ?? null,
+		active_dates: (row.active_dates as { from: string; to: string }[] | null) ?? null,
+		active_hours: (row.active_hours as { from: string; to: string }[] | null) ?? null,
+		trigger_values:
+			(row.trigger_values as { min: number | null; max: number | null } | null) ?? null,
+	};
 }

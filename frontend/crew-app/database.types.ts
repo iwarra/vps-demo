@@ -431,12 +431,16 @@ export type Database = {
           active_hours: Json | null
           alert_interval_minutes: number | null
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           delivery_alert_setting_id: string
           description: string | null
+          is_deleted: boolean | null
           receivers: Json | null
           status: string | null
           trigger_values: Json | null
           type: string | null
+          updated_at: string | null
           vehicles: string[] | null
         }
         Insert: {
@@ -444,12 +448,16 @@ export type Database = {
           active_hours?: Json | null
           alert_interval_minutes?: number | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           delivery_alert_setting_id?: string
           description?: string | null
+          is_deleted?: boolean | null
           receivers?: Json | null
           status?: string | null
           trigger_values?: Json | null
           type?: string | null
+          updated_at?: string | null
           vehicles?: string[] | null
         }
         Update: {
@@ -457,12 +465,16 @@ export type Database = {
           active_hours?: Json | null
           alert_interval_minutes?: number | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           delivery_alert_setting_id?: string
           description?: string | null
+          is_deleted?: boolean | null
           receivers?: Json | null
           status?: string | null
           trigger_values?: Json | null
           type?: string | null
+          updated_at?: string | null
           vehicles?: string[] | null
         }
         Relationships: []

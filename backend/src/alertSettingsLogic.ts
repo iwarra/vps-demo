@@ -1,15 +1,18 @@
 import { supabase } from './supabase.ts';
 import dotenv from 'dotenv';
-import type { Alert, Validator, AlertSettingId, DeliveryAlertLog } from './types.ts';
+import type { Validator, AlertSettingId, DelAlertSetting } from './types.ts';
 import {
 	createAlertLog,
 	fetchLatestTemperature,
+	normalizeDeliveryAlertSetting,
 	separateContacts,
 } from './utils/deliveryAlertSetting.ts';
 dotenv.config();
+import type { Database } from '../database.types.ts';
+type AlertLog = Database['public']['Tables']['delivery_alert_logs']['Row'];
 
 export class CreateDeliveryAlertSettings {
-	activeAlerts: Map<AlertSettingId, Alert> = new Map(); //save all alerts, not just ids to be able to get data without fetching again
+	activeAlerts: Map<AlertSettingId, DelAlertSetting> = new Map(); //save all alerts, not just ids to be able to get data without fetching again
 	forToday: Set<AlertSettingId> = new Set();
 	forThisHour: Set<AlertSettingId> = new Set();
 	scheduled: Map<AlertSettingId, ReturnType<typeof setTimeout>> = new Map(); //key: alertSettingId, value: timeoutId
@@ -30,7 +33,7 @@ export class CreateDeliveryAlertSettings {
 		}
 	}
 
-	async isAlreadyAlerted(alertSetting: Alert, alertLogType: string): Promise<boolean> {
+	async isAlreadyAlerted(alertSetting: DelAlertSetting, alertLogType: string): Promise<boolean> {
 		try {
 			const { data, error } = await supabase
 				.from('delivery_alert_logs')
@@ -81,7 +84,7 @@ export class CreateDeliveryAlertSettings {
 	}
 
 	//TODO: how to handle emails not being sent - through return, posthog?
-	async sendAlert(alertSetting: Alert) {
+	async sendAlert(alertSetting: DelAlertSetting) {
 		if (!alertSetting.receivers) return;
 		const { emails, phoneNumbers } = separateContacts(alertSetting.receivers);
 		try {
@@ -103,9 +106,9 @@ export class CreateDeliveryAlertSettings {
 	}
 
 	//TODO: Do we need a return?
-	async handleAlertSetting(alertSetting: Alert): Promise<void> {
+	async handleAlertSetting(alertSetting: DelAlertSetting): Promise<void> {
 		let alertLogCreated = false;
-		let alertLog: DeliveryAlertLog | null = null; // rewrite supabase data after sending to DB - useful to have for sending alert info
+		let alertLog: AlertLog | null = null; // rewrite supabase data after sending to DB - useful to have for sending alert info
 		let alertTriggered = false;
 		const { type, trigger_values: condition } = alertSetting;
 		let alertLogType = '';
@@ -137,8 +140,8 @@ export class CreateDeliveryAlertSettings {
 		try {
 			if (type === 'temperature') {
 				alertTriggered = await checkTemperature({
-					min: condition.min ?? undefined,
-					max: condition.max ?? undefined,
+					min: condition?.min ?? undefined,
+					max: condition?.max ?? undefined,
 				});
 				console.log('Trigger check for temp type: ', alertTriggered, ' for ', alertLogType);
 			}
@@ -157,7 +160,7 @@ export class CreateDeliveryAlertSettings {
 		}
 	}
 
-	async sortBy(setting: Alert, conditions: Validator[]): Promise<boolean> {
+	async sortBy(setting: DelAlertSetting, conditions: Validator[]): Promise<boolean> {
 		if (typeof setting !== 'object') return false;
 		for (const condition of conditions) {
 			if (condition == 'hasActiveDates') {
@@ -241,7 +244,7 @@ export class CreateDeliveryAlertSettings {
 	}
 
 	async addToSchedule(alertSettingId: AlertSettingId): Promise<void> {
-		const alert = this.activeAlerts.get(alertSettingId) as Alert | undefined;
+		const alert = this.activeAlerts.get(alertSettingId) as DelAlertSetting | undefined;
 		let intervalMs;
 		if (!alert) {
 			console.warn(`addToSchedule: No alert found for ${alertSettingId}`);
@@ -292,7 +295,7 @@ export class CreateDeliveryAlertSettings {
 	}
 
 	//TODO: set as private
-	async fetchActiveDeliveryAlertSettings(): Promise<Alert[]> {
+	async fetchActiveDeliveryAlertSettings(): Promise<DelAlertSetting[]> {
 		try {
 			const { data, error } = await supabase
 				.from('delivery_alert_settings')
@@ -300,8 +303,9 @@ export class CreateDeliveryAlertSettings {
 				.eq('status', 'active')
 				.or('is_deleted.is.null,is_deleted.eq.false');
 			if (error) throw error;
-			console.log('Data: ', data);
-			return data as Alert[];
+			if (!data) return [];
+			const normalized = data?.map((row) => normalizeDeliveryAlertSetting(row)) ?? [];
+			return normalized;
 		} catch (error) {
 			console.error('Error fetching alert settings:', error);
 			return [];
@@ -350,7 +354,7 @@ export class CreateDeliveryAlertSettings {
 		}
 	}
 
-	async processAlerts(alerts: Alert[], sortingCriteria: Validator[]): Promise<void> {
+	async processAlerts(alerts: DelAlertSetting[], sortingCriteria: Validator[]): Promise<void> {
 		for (const alert of alerts) {
 			await this.sortBy(alert, sortingCriteria);
 		}

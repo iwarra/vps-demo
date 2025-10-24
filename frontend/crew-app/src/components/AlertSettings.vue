@@ -652,8 +652,8 @@ async function getVehicles(forceRefresh = false) {
 
 		const mapped =
 			data?.map((v) => ({
-				id: v.vehicle_id,
-				registration: v.licence_number,
+				id: v.vehicle_id ?? '',
+				registration: v.licence_number ?? '',
 			})) || [];
 
 		localStorage.setItem(CACHE_KEY, JSON.stringify({ data: mapped, timestamp: Date.now() }));
@@ -692,11 +692,12 @@ async function getDrivers(forceRefresh = false) {
 		if (error) throw error;
 
 		const mapped = data.map((d) => ({
-			id: d.user_id,
+			id: d.user_id ?? '',
 			phoneNumber: d.contact_phone_number || '',
 			email: d.contact_email || '',
 			displayName:
-				(d.drivers_user_id_fkey as { display_name: string }[])[0]?.display_name || 'No Name',
+				(d.drivers_user_id_fkey as unknown as { display_name: string }[])[0]?.display_name ||
+				'No Name',
 		}));
 
 		localStorage.setItem(CACHE_KEY, JSON.stringify({ data: mapped, timestamp: Date.now() }));

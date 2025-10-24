@@ -1,3 +1,5 @@
+import type { Database } from '../database.types.ts';
+
 export type Validator = 'hasActiveDates' | 'isActiveThisHour' | 'isActiveToday'; // extend as needed
 export type AlertSettingId = string | number;
 export interface Alert {
@@ -12,6 +14,8 @@ export interface Alert {
 	trigger_values: { min: number | null; max: number | null };
 	created_at: string | null;
 	status: string | null;
+	is_deleted: boolean | null;
+	updated_at: string | null;
 }
 export interface Receiver {
 	receiverName: string;
@@ -31,3 +35,17 @@ export interface DeliveryAlertLog {
 	sent_at: string | null;
 	vehicle_id: string | null;
 }
+
+export type DateRange = { from: string; to: string };
+export type HourRange = { from: string; to: string };
+export type TriggerValues = { min: number | null; max: number | null };
+
+export type DelAlertSetting = Omit<
+	Database['public']['Tables']['delivery_alert_settings']['Row'],
+	'receivers' | 'active_dates' | 'active_hours' | 'trigger_values'
+> & {
+	receivers: Receiver[] | null;
+	active_dates: DateRange[] | null;
+	active_hours: HourRange[] | null;
+	trigger_values: TriggerValues | null;
+};
