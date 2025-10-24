@@ -1,16 +1,19 @@
 {
 	"compilerOptions": {
+		"lib": ["es2024", "ESNext.Array", "ESNext.Collection", "ESNext.Iterator"],
+		"module": "nodenext",
 		"target": "ES2022",
-		"module": "ESNext",
-		"moduleResolution": "node",
+		"moduleResolution": "nodenext",
 		"esModuleInterop": true,
 		"skipLibCheck": true,
-		"allowImportingTsExtensions": false,
+		"rewriteRelativeImportExtensions": true,
 		"strict": true,
 		"resolveJsonModule": true,
 		"allowSyntheticDefaultImports": true,
 		"outDir": "dist",
-		"types": ["node", "jest"]
+		"types": ["node"],
+		"isolatedModules": true
 	},
-	"include": ["src"]
+	"include": ["src/**/*.ts"],
+	"exclude": ["node_modules", "dist"]
 }
