@@ -569,6 +569,21 @@ const form = reactive({
 	...initialForm,
 });
 
+function resetForm() {
+	form.description = '';
+	form.alertType = '';
+	form.tracking = 'placeholder';
+	form.selectedTrackingItems = [];
+	form.dateRanges = [{ from: '', to: '' }];
+	form.activeHours = [{ from: '', to: '' }];
+	form.interval = null;
+	form.receiverOption = null;
+	form.receivers = [];
+	form.tempMin = null;
+	form.tempMax = null;
+	form.delayMinutes = null;
+}
+
 const newReceiver = reactive<Receiver>({
 	receiverName: '',
 	phoneNumber: '',
@@ -838,8 +853,8 @@ function addSelectedCustomerLocations() {
 
 async function handleSubmit() {
 	try {
-		const tokenResponse = await fetch('http://13.60.98.248:8080/api/auth/test-login', {
-			method: 'POST', // stays POST for security and semantics
+		const tokenResponse = await fetch('http://localhost:8080/api/auth/test-login', {
+			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 		});
 
@@ -865,12 +880,7 @@ async function handleSubmit() {
 		const alertSettingToAdd = {
 			description: form.description,
 			vehicles: form.selectedTrackingItems,
-			type:
-				form.alertType == 'temperature' && form.tempMin
-					? 'low_temperature'
-					: form.alertType == 'temperature' && form.tempMax
-					? 'high_temperature'
-					: form.alertType,
+			type: form.alertType,
 			active_hours: form.activeHours,
 			receivers: formattedReceivers,
 			active_dates: form.dateRanges,
@@ -878,9 +888,10 @@ async function handleSubmit() {
 			trigger_values: triggerValues,
 			status: 'active',
 			created_at: null,
+			updated_at: null,
+			is_deleted: null,
 		};
-		console.log('Alert setting to send to BE: ', alertSettingToAdd);
-		const response = await fetch('http://13.60.98.248:8080/api/delivery-alert-setting/add', {
+		const response = await fetch('http://localhost:8080/api/delivery-alert-setting/add', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
@@ -890,8 +901,7 @@ async function handleSubmit() {
 		});
 		console.log(response);
 		//Reset form after successful submission
-		Object.assign(form, initialForm);
-		form.receivers = []; //reset to remove the list of selected receivers from UI after submitting
+		resetForm();
 	} catch (error) {
 		console.error('Error submitting form:', error);
 	}
