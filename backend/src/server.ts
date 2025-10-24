@@ -2,9 +2,11 @@ import express from 'express';
 import { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { supabase } from './supabase.js';
+import { supabase } from './supabase.ts';
 import { createClient, type User } from '@supabase/supabase-js';
-import { CreateDeliveryAlertSettings } from './alertSettingsLogic.js';
+import { CreateDeliveryAlertSettings } from './alertSettingsLogic.ts';
+import { AlertScheduler } from './scheduler.ts';
+import { normalizeDeliveryAlertSetting } from './utils/deliveryAlertSetting.ts';
 dotenv.config();
 
 //TODO: Implement user checks in all requests (delete needs extra role logic)
@@ -19,6 +21,8 @@ declare global {
 }
 
 export const delAlertSettingsHandler = new CreateDeliveryAlertSettings();
+const cronAlertScheduler = new AlertScheduler();
+cronAlertScheduler.startTest(); //start all jobs when the app is started
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -88,18 +92,21 @@ app.post('/api/delivery-alert-setting/add', verifyUser, async (req: Request, res
 				active_dates: alertSetting.active_dates,
 				status: 'active',
 				trigger_values: alertSetting.trigger_values,
+				updated_at: alertSetting.updated_at,
+				is_deleted: alertSetting.is_deleted,
 			})
 			.select()
 			.single();
 		if (error) return res.status(400).json({ error: error.message });
-		await delAlertSettingsHandler.sortBy(data, [
+		const normalizedData = normalizeDeliveryAlertSetting(data);
+		const isAdded = await delAlertSettingsHandler.sortBy(normalizedData, [
 			'hasActiveDates',
 			'isActiveToday',
 			'isActiveThisHour',
 		]);
-		delAlertSettingsHandler.forThisHour.forEach(
-			async (alertId) => await delAlertSettingsHandler.addToSchedule(alertId),
-		);
+		if (isAdded) {
+			await delAlertSettingsHandler.addToSchedule(data.delivery_alert_setting_id);
+		}
 		res.status(201).json({ ok: true });
 	} catch (error) {
 		console.error(error);
@@ -111,24 +118,27 @@ app.patch('/api/delivery-alert-setting/:id', async (req: Request, res: Response)
 	try {
 		const { id } = req.params;
 		const payload = req.body;
-
 		const { data, error } = await supabase
 			.from('delivery_alert_settings')
 			.update(payload)
 			.eq('delivery_alert_setting_id', id)
 			.select()
 			.single();
-
-		//TODO: How to know if we need to call add to schedule here?
+		if (!data) return res.status(404).json({ error: error.message });
 		const delAlertSettingId = data.delivery_alert_setting_id;
 		delAlertSettingsHandler.removeAlertFromSystem(delAlertSettingId);
-		await delAlertSettingsHandler.sortBy(delAlertSettingId, [
+		const normalizedData = normalizeDeliveryAlertSetting(data);
+		const isActive = await delAlertSettingsHandler.sortBy(normalizedData, [
 			'hasActiveDates',
 			'isActiveToday',
 			'isActiveThisHour',
 		]);
 
-		if (error) return res.status(400).json({ error: error.message });
+		if (isActive) {
+			await delAlertSettingsHandler.addToSchedule(delAlertSettingId);
+		}
+
+		if (error) return res.status(400).json({ error });
 		res.json(data);
 	} catch (error) {
 		console.error(error);
@@ -141,7 +151,7 @@ app.delete('/api/delivery-alert-setting/:id', async (req: Request, res: Response
 		const { id } = req.params;
 		const { data, error } = await supabase
 			.from('delivery_alert_settings')
-			.delete()
+			.update({ status: 'expired', is_deleted: true })
 			.eq('delivery_alert_setting_id', id)
 			.select();
 		if (error) return res.status(400).json({ error: error.message });
