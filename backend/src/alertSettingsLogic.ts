@@ -20,34 +20,47 @@ export class CreateDeliveryAlertSettings {
 	private remainderForToday = 0;
 	private remainderForThisHour = 0;
 
-	async markAlertAsSent(settingId: string): Promise<void> {
+	async markAlertAsSent(delAlertSettingId: string, alertLogType: string): Promise<void> {
 		try {
-			const { error } = await supabase
+			const { data: latestLog, error: errorFetchingLatestLog } = await supabase
 				.from('delivery_alert_logs')
-				.update({ sent: true, sent_at: new Date().toISOString() })
-				.eq('delivery_alert_setting_id', settingId);
+				.select('delivery_alert_log_id')
+				.eq('delivery_alert_setting_id', delAlertSettingId)
+				.eq('alert_type', alertLogType)
+				.order('created_at', { ascending: false })
+				.limit(1)
+				.single();
 
-			if (error) throw error;
+			if (errorFetchingLatestLog) {
+				console.error('Error fetching latest log:', errorFetchingLatestLog);
+			} else if (latestLog) {
+				const { error: updateError } = await supabase
+					.from('delivery_alert_logs')
+					.update({ sent: true, sent_at: new Date().toISOString() })
+					.eq('delivery_alert_log_id', latestLog.delivery_alert_log_id);
+
+				if (updateError) {
+					console.error('Error updating latest log:', updateError);
+				}
+			}
 		} catch (err) {
 			console.error('Failed updating alert log as sent:', err);
 		}
 	}
 
-	async isAlreadyAlerted(alertSetting: DelAlertSetting, alertLogType: string): Promise<boolean> {
+	async isAlreadyAlerted(alertSettingId: string, alertLogType: string): Promise<boolean> {
 		try {
 			const { data, error } = await supabase
 				.from('delivery_alert_logs')
 				.select('delivery_alert_log_id, sent_at, sent, alert_type')
-				.eq('delivery_alert_setting_id', alertSetting.delivery_alert_setting_id)
+				.eq('delivery_alert_setting_id', alertSettingId)
 				.eq('sent', true)
+				.eq('alert_type', alertLogType)
 				.order('sent_at', { ascending: false }) //latest sent alert
 				.limit(1);
 
-			console.log(data);
 			if (error) throw error;
-			if (!data || data.length === 0) return false;
-			if (data[0].alert_type === alertLogType) return true;
-			else return false;
+			return data && data.length > 0; // Returns true if at least one matching alert exists
 		} catch (error) {
 			console.error('Failed checking alert history:', error);
 			return false; // Fail-safe: treat as not alerted to allow retry
@@ -111,7 +124,7 @@ export class CreateDeliveryAlertSettings {
 		let alertLog: AlertLog | null = null; // rewrite supabase data after sending to DB - useful to have for sending alert info
 		let alertTriggered = false;
 		const { type, trigger_values: condition } = alertSetting;
-		let alertLogType = '';
+		let alertLogType: string = '';
 
 		console.log('The alert setting type: ', type);
 		const checkTemperature = async (condition: { min?: number; max?: number } | null) => {
@@ -121,17 +134,18 @@ export class CreateDeliveryAlertSettings {
 			console.log('Starting the handler with this condition: ', condition);
 			if (condition.min && temperature < condition.min) {
 				alertLogType = 'low_temperature';
-				console.log('Setting min_temp: ', alertLogType, condition.min);
+				//console.log('Setting min_temp: ', alertLogType, condition.min);
 				triggered = true;
 			} else if (condition.max && temperature > condition.max) {
 				alertLogType = 'high_temperature';
-				console.log('Setting max_temp: ', alertLogType, condition.max);
+				//console.log('Setting max_temp: ', alertLogType, condition.max);
 				triggered = true;
 			} else {
 				triggered = false;
 				return false;
 			}
-			if (triggered) {
+			if (triggered && alertLogType !== '') {
+				console.log('After empty string check');
 				alertLog = await createAlertLog(alertSetting, temperature, alertLogType);
 				alertLogCreated = true;
 			}
@@ -148,11 +162,12 @@ export class CreateDeliveryAlertSettings {
 			if (!alertTriggered) return;
 
 			if (alertLogCreated && alertTriggered) {
-				const alreadyAlerted = await this.isAlreadyAlerted(alertSetting, alertLogType);
+				const delAlertSettingId = alertSetting.delivery_alert_setting_id;
+				const alreadyAlerted = await this.isAlreadyAlerted(delAlertSettingId, alertLogType);
 				console.log('Is it already alerted: ', alreadyAlerted);
 				if (!alreadyAlerted) {
 					await this.sendAlert(alertSetting);
-					await this.markAlertAsSent(alertSetting.delivery_alert_setting_id);
+					await this.markAlertAsSent(delAlertSettingId, alertLogType);
 				}
 			}
 		} catch (err) {

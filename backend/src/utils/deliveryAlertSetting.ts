@@ -24,7 +24,6 @@ export async function createAlertLog(
 			.select();
 
 		if (error) throw error;
-		console.log('The created log: ', data[0]);
 		//TODO: Handle error so alert isn't sent on every trigger
 		return data?.[0];
 	} catch (err) {
