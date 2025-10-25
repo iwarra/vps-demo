@@ -23,6 +23,7 @@ declare global {
 export const delAlertSettingsHandler = new CreateDeliveryAlertSettings();
 const cronAlertScheduler = new AlertScheduler();
 cronAlertScheduler.startTest(); //start all jobs when the app is started
+//cronAlertScheduler.stopAll();
 const app = express();
 const PORT = process.env.PORT || 8080;
 
@@ -99,11 +100,13 @@ app.post('/api/delivery-alert-setting/add', verifyUser, async (req: Request, res
 			.single();
 		if (error) return res.status(400).json({ error: error.message });
 		const normalizedData = normalizeDeliveryAlertSetting(data);
+		console.log(normalizedData);
 		const isAdded = await delAlertSettingsHandler.sortBy(normalizedData, [
 			'hasActiveDates',
 			'isActiveToday',
 			'isActiveThisHour',
 		]);
+		console.log(isAdded);
 		if (isAdded) {
 			await delAlertSettingsHandler.addToSchedule(data.delivery_alert_setting_id);
 		}

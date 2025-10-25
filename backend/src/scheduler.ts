@@ -36,7 +36,7 @@ export class AlertScheduler {
 
 		//test job - edit time to trigger when needed
 		this.testJob = new CronJob(
-			'0 58 15 * * *', // every 30 seconds -/30
+			'0 00 14 * * *', // every 30 seconds -/30
 			async () => {
 				console.log('[TEST] Running daily alert fetch (every 30s)');
 				await this.delAlertSettingService.rebuild();
