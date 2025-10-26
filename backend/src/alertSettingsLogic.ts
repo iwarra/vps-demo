@@ -60,7 +60,7 @@ export class CreateDeliveryAlertSettings {
 				.limit(1);
 
 			if (error) throw error;
-			return data && data.length > 0; // Returns true if at least one matching alert exists
+			return Boolean(data && data.length > 0); // Returns true if at least one matching alert exists
 		} catch (error) {
 			console.error('Failed checking alert history:', error);
 			return false; // Fail-safe: treat as not alerted to allow retry
@@ -130,7 +130,7 @@ export class CreateDeliveryAlertSettings {
 		const checkTemperature = async (condition: { min?: number; max?: number } | null) => {
 			const temperature = await fetchLatestTemperature();
 			let triggered = false;
-			if (!temperature || !condition) return false;
+			if (temperature === undefined || temperature === null || !condition) return false;
 			console.log('Starting the handler with this condition: ', condition);
 			if (condition.min && temperature < condition.min) {
 				alertLogType = 'low_temperature';
