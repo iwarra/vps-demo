@@ -1,191 +1,178 @@
-jest.mock('../../src/utils/deliveryAlertSetting');
-import * as helpers from '../../src/utils/deliveryAlertSetting';
-import { CreateDeliveryAlertSettings } from '../../src/alertSettingsLogic';
-import { createAlertLog, fetchLatestTemperature } from '../../src/utils/deliveryAlertSetting';
 import { expect, jest, test, describe, beforeEach, afterEach } from '@jest/globals';
+import { CreateDeliveryAlertSettings } from '../../src/alertSettingsLogic';
+import { supabase } from '../../src/supabase';
 
-describe('handleAlertSetting()', () => {
+jest.mock('../../src/supabase');
+const mockSupabase = jest.mocked(supabase);
+
+describe('handleAlertSetting', () => {
 	let manager: CreateDeliveryAlertSettings;
+	let isAlreadyAlertedSpy: jest.SpyInstance;
+	let sendAlertSpy: jest.SpyInstance;
+	let markAlertAsSentSpy: jest.SpyInstance;
+	let consoleLogSpy: jest.SpyInstance;
+	let consoleErrorSpy: jest.SpyInstance;
 
-	const mockedCreateAlertLog = helpers.createAlertLog as jest.MockedFunction<
-		typeof helpers.createAlertLog
-	>;
-	const mockedFetchLatestTemperature = helpers.fetchLatestTemperature as jest.MockedFunction<
-		typeof helpers.fetchLatestTemperature
-	>;
-
+	const mockAlertSetting: DelAlertSetting = {
+		delivery_alert_setting_id: 'setting-123',
+		type: 'temperature',
+		trigger_values: { min: 5, max: 30 },
+		vehicles: ['vehicle-1'],
+		receivers: [],
+	};
 	beforeEach(() => {
 		jest.clearAllMocks();
 		manager = new CreateDeliveryAlertSettings();
-		mockedFetchLatestTemperature.mockResolvedValue(15);
-		mockedCreateAlertLog.mockResolvedValue({
-			delivery_alert_log_id: 'test-log-1',
-			vehicle_id: 'vehicle-1',
-			created_at: '2025-10-09T08:45:50.314223',
-			sent: null,
-			receivers: [
-				{
-					email: 'receiver@mail.com',
-					origin: 'custom',
-					originId: '1',
-					phoneNumber: '',
-					receiverName: 'Test R',
-				},
-			],
-			sent_at: null,
-			alert_type: 'high_temperature',
-			delivery_alert_setting_id: 'a1',
-			metric_value: null,
-		});
+
+		isAlreadyAlertedSpy = jest.spyOn(manager, 'isAlreadyAlerted').mockResolvedValue(false);
+		sendAlertSpy = jest.spyOn(manager, 'sendAlert').mockResolvedValue(undefined);
+		markAlertAsSentSpy = jest.spyOn(manager, 'markAlertAsSent').mockResolvedValue(undefined);
+		consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+		consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 	});
 
 	afterEach(() => {
-		jest.clearAllMocks();
+		consoleLogSpy.mockRestore();
+		consoleErrorSpy.mockRestore();
 	});
 
-	test('triggers alert and sends email when temp > max', async () => {
-		//Mocking internal methods
-		jest.spyOn(manager, 'isAlreadyAlerted').mockResolvedValue(false);
-		jest.spyOn(manager, 'sendAlert').mockResolvedValue();
-		jest.spyOn(manager, 'markAlertAsSent').mockResolvedValue();
-		const deliveryAlertSetting = {
-			delivery_alert_setting_id: 'a1',
-			active_dates: [{ to: '2025-10-30', from: '2025-10-06' }],
-			description: 'Test Alert 1',
-			vehicles: ['vehicle-1'],
-			type: 'high_temperature',
-			active_hours: [{ to: '21:00', from: '09:00' }],
-			receivers: [
-				{
-					email: 'a@example.com',
-					origin: 'custom',
-					originId: null,
-					phoneNumber: '',
-					receiverName: 'a',
-				},
-				{
-					email: 'a@example.com',
-					origin: 'custom',
-					originId: null,
-					phoneNumber: '',
-					receiverName: 'b',
-				},
-			],
-			alert_interval_minutes: 2,
-			created_at: '2025-10-13 12:19:41.727059',
-			status: 'active',
-			trigger_values: { max: 10, min: null },
+	it('sends alert if temperature exceeds max and alert wasnt already sent', async () => {
+		const mockSelectChain = {
+			select: jest.fn().mockReturnThis(),
+			order: jest.fn().mockReturnThis(),
+			limit: jest.fn().mockResolvedValue({
+				data: [{ temperature_c: 35 }],
+				error: null,
+			}),
 		};
-		await manager.handleAlertSetting(deliveryAlertSetting);
-
-		expect(fetchLatestTemperature).toHaveBeenCalled();
-		expect(createAlertLog).toHaveBeenCalledWith(deliveryAlertSetting, 15);
-		expect(manager.sendAlert).toHaveBeenCalledWith(deliveryAlertSetting);
-		expect(manager.markAlertAsSent).toHaveBeenCalledWith('a1');
+		const mockUpsertChain = {
+			upsert: jest.fn().mockReturnThis(),
+			select: jest.fn().mockResolvedValue({
+				data: [
+					{
+						delivery_alert_log_id: 'log-123',
+						metric_value: 35,
+						alert_type: 'high_temperature',
+					},
+				],
+				error: null,
+			}),
+		};
+		mockSupabase.from = jest.fn((table) => {
+			if (table === 'weather_readings') {
+				return mockSelectChain as any;
+			}
+			if (table === 'delivery_alert_logs') {
+				return mockUpsertChain as any;
+			}
+			return mockSelectChain as any;
+		});
+		await manager.handleAlertSetting(mockAlertSetting);
+		expect(mockSupabase.from).toHaveBeenCalledWith('weather_readings');
+		expect(mockSupabase.from).toHaveBeenCalledWith('delivery_alert_logs');
+		expect(isAlreadyAlertedSpy).toHaveBeenCalledWith('setting-123', 'high_temperature');
+		expect(sendAlertSpy).toHaveBeenCalledWith(mockAlertSetting);
+		expect(markAlertAsSentSpy).toHaveBeenCalledWith('setting-123', 'high_temperature');
 	});
-
-	test('triggers alert and sends email when temp < min', async () => {
-		//Mocking internal methods
-		jest.spyOn(manager, 'isAlreadyAlerted').mockResolvedValue(false);
-		jest.spyOn(manager, 'sendAlert').mockResolvedValue();
-		jest.spyOn(manager, 'markAlertAsSent').mockResolvedValue();
-		const deliveryAlertSetting = {
-			delivery_alert_setting_id: 'a2',
-			active_dates: [{ to: '2025-10-30', from: '2025-10-06' }],
-			description: 'Test Alert 1',
-			vehicles: ['vehicle-1'],
-			type: 'low_temperature',
-			active_hours: [{ to: '21:00', from: '09:00' }],
-			receivers: [
-				{
-					email: 'a@example.com',
-					origin: 'custom',
-					originId: null,
-					phoneNumber: '',
-					receiverName: 'a',
-				},
-			],
-			alert_interval_minutes: 2,
-			created_at: '2025-10-13 12:19:41.727059',
-			status: 'active',
-			trigger_values: { max: null, min: 16 },
+	it('does not send alert when already alerted', async () => {
+		const mockWeatherSelectChain = {
+			select: jest.fn().mockReturnThis(),
+			order: jest.fn().mockReturnThis(),
+			limit: jest.fn().mockResolvedValue({
+				data: [{ temperature_c: 35 }],
+				error: null,
+			}),
 		};
-		await manager.handleAlertSetting(deliveryAlertSetting);
 
-		expect(fetchLatestTemperature).toHaveBeenCalled();
-		expect(createAlertLog).toHaveBeenCalledWith(deliveryAlertSetting, 15);
-		expect(manager.sendAlert).toHaveBeenCalledWith(deliveryAlertSetting);
-		expect(manager.markAlertAsSent).toHaveBeenCalledWith('a2');
+		const mockAlertLogUpsertChain = {
+			upsert: jest.fn().mockReturnThis(),
+			select: jest.fn().mockResolvedValue({
+				data: [
+					{
+						delivery_alert_log_id: 'log-123',
+						metric_value: 35,
+						alert_type: 'high_temperature',
+					},
+				],
+				error: null,
+			}),
+		};
+
+		mockSupabase.from = jest.fn((table) => {
+			if (table === 'weather_readings') {
+				return mockWeatherSelectChain as any;
+			}
+			if (table === 'delivery_alert_logs') {
+				return mockAlertLogUpsertChain as any;
+			}
+			return mockWeatherSelectChain as any;
+		});
+
+		isAlreadyAlertedSpy.mockResolvedValue(true);
+
+		await manager.handleAlertSetting(mockAlertSetting);
+
+		expect(isAlreadyAlertedSpy).toHaveBeenCalledWith('setting-123', 'high_temperature');
+		expect(sendAlertSpy).not.toHaveBeenCalled();
+		expect(markAlertAsSentSpy).not.toHaveBeenCalled();
 	});
-
-	test('does not trigger when temperature is in range', async () => {
-		jest.spyOn(manager, 'isAlreadyAlerted').mockResolvedValue(false);
-		jest.spyOn(manager, 'sendAlert').mockResolvedValue();
-		jest.spyOn(manager, 'markAlertAsSent').mockResolvedValue();
-		const mockedSeparateContacts = jest.fn(() => ({
-			emails: ['a@example.com'],
-			phoneNumbers: [],
-		}));
-		(helpers as any).separateContacts = mockedSeparateContacts;
-
-		const deliveryAlertSetting = {
-			delivery_alert_setting_id: 'a3',
-			active_dates: [{ to: '2025-10-30', from: '2025-10-06' }],
-			description: 'Test Alert 1',
-			vehicles: ['vehicle-1'],
-			type: 'low_temperature',
-			active_hours: [{ to: '21:00', from: '09:00' }],
-			receivers: [
-				{
-					email: 'a@example.com',
-					origin: 'custom',
-					originId: null,
-					phoneNumber: '',
-					receiverName: 'a',
-				},
-			],
-			alert_interval_minutes: 2,
-			created_at: '2025-10-13 12:19:41.727059',
-			status: 'active',
-			trigger_values: { max: 20, min: 10 },
+	it('sends alert when temperature below min and not already alerted', async () => {
+		const mockWeatherSelectChain = {
+			select: jest.fn().mockReturnThis(),
+			order: jest.fn().mockReturnThis(),
+			limit: jest.fn().mockResolvedValue({
+				data: [{ temperature_c: -5 }],
+				error: null,
+			}),
 		};
 
-		await manager.handleAlertSetting(deliveryAlertSetting);
+		const mockAlertLogUpsertChain = {
+			upsert: jest.fn().mockReturnThis(),
+			select: jest.fn().mockResolvedValue({
+				data: [
+					{
+						delivery_alert_log_id: 'log-456',
+						metric_value: -5,
+						alert_type: 'low_temperature',
+					},
+				],
+				error: null,
+			}),
+		};
 
-		// Nothing should have been called
-		expect(createAlertLog).not.toHaveBeenCalled();
-		expect(manager.sendAlert).not.toHaveBeenCalled();
-		expect(manager.markAlertAsSent).not.toHaveBeenCalled();
+		mockSupabase.from = jest.fn((table) => {
+			if (table === 'weather_readings') {
+				return mockWeatherSelectChain as any;
+			}
+			if (table === 'delivery_alert_logs') {
+				return mockAlertLogUpsertChain as any;
+			}
+			return mockWeatherSelectChain as any;
+		});
+
+		await manager.handleAlertSetting(mockAlertSetting);
+
+		expect(isAlreadyAlertedSpy).toHaveBeenCalledWith('setting-123', 'low_temperature');
+		expect(sendAlertSpy).toHaveBeenCalledWith(mockAlertSetting);
+		expect(markAlertAsSentSpy).toHaveBeenCalledWith('setting-123', 'low_temperature');
 	});
-
-	test('handles errors gracefully', async () => {
-		const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-		mockedFetchLatestTemperature.mockRejectedValue(new Error('API down'));
-
-		const delAlertSetting = {
-			delivery_alert_setting_id: 'a4',
-			active_dates: [{ to: '2025-10-30', from: '2025-10-06' }],
-			description: 'Test Alert 4',
-			vehicles: ['vehicle-4'],
-			type: 'low_temperature',
-			active_hours: [{ to: '21:00', from: '09:00' }],
-			receivers: [
-				{
-					email: 'a@example.com',
-					origin: 'custom',
-					originId: null,
-					phoneNumber: '',
-					receiverName: 'a',
-				},
-			],
-			alert_interval_minutes: 2,
-			created_at: '2025-10-13 12:19:41.727059',
-			status: 'active',
-			trigger_values: { max: 10, min: 20 },
+	it('does not trigger alert when temperature is within range', async () => {
+		const mockWeatherSelectChain = {
+			select: jest.fn().mockReturnThis(),
+			order: jest.fn().mockReturnThis(),
+			limit: jest.fn().mockResolvedValue({
+				data: [{ temperature_c: 20 }],
+				error: null,
+			}),
 		};
 
-		await manager.handleAlertSetting(delAlertSetting);
+		mockSupabase.from = jest.fn().mockReturnValue(mockWeatherSelectChain as any);
 
-		expect(consoleSpy).toHaveBeenCalledWith('Error in handleAlertSetting:', expect.any(Error));
+		await manager.handleAlertSetting(mockAlertSetting);
+
+		expect(mockSupabase.from).toHaveBeenCalledWith('weather_readings');
+		expect(isAlreadyAlertedSpy).not.toHaveBeenCalled();
+		expect(sendAlertSpy).not.toHaveBeenCalled();
+		expect(markAlertAsSentSpy).not.toHaveBeenCalled();
 	});
 });

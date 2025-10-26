@@ -32,6 +32,7 @@ describe('Scheduler rebuild methods', () => {
 			.mockResolvedValue([{ delivery_alert_setting_id: 'new-1' }] as any);
 		jest.spyOn(manager, 'sortBy').mockImplementation(async (alert, rules) => {
 			manager.forThisHour.add(alert.delivery_alert_setting_id); // simulate sorting result
+			return true;
 		});
 		jest.spyOn(global, 'setTimeout').mockImplementation((fn: (...args: any[]) => void) => {
 			// Do nothing, just return a fake Timeout-like object
@@ -118,6 +119,7 @@ describe('Scheduler rebuild methods', () => {
 			if (alert.delivery_alert_setting_id === 'B' && currentHour === 10) {
 				manager.forThisHour.add('B');
 			}
+			return true;
 		});
 
 		// Spy on addToSchedule and actually insert into scheduled map

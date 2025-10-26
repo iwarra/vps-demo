@@ -4,7 +4,6 @@ import { expect, jest, test, describe, beforeEach, afterEach } from '@jest/globa
 describe('addToSchedule', () => {
 	let manager: CreateDeliveryAlertSettings;
 
-	// Suppose you spy on `manager.handleAlertSetting`
 	let mockHandleAlertSetting: jest.SpiedFunction<typeof manager.handleAlertSetting>;
 	let mockRemoveFromSchedule: jest.SpiedFunction<typeof manager.removeFromSchedule>;
 
