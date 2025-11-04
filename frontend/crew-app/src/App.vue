@@ -1,14 +1,31 @@
-<script setup lang="ts">
-// import HelloWorld from './components/HelloWorld.vue';
-import AlertSettings from './components/AlertSettings.vue';
-</script>
+<script setup lang="ts"></script>
 
 <template>
-	<!-- <div>
-		<h1>Testing from home page! :)</h1>
-	</div> -->
-	<!-- <HelloWorld /> -->
-	<AlertSettings />
+	<h1>Hello World!</h1>
+	<p>Welcome to my new awesome demo!</p>
+	<RouterLink
+		to="/home"
+		class="space"
+		>Go to Home</RouterLink
+	>
+	<RouterLink
+		to="/login"
+		class="space"
+		>Go to Login</RouterLink
+	>
+	<RouterLink
+		to="/table"
+		class="space"
+		>Table View</RouterLink
+	>
+	<RouterLink to="/test">My Table View</RouterLink>
+	<main>
+		<RouterView />
+	</main>
 </template>
 
-<style scoped></style>
+<style scoped>
+.space {
+	margin-right: 10px;
+}
+</style>
