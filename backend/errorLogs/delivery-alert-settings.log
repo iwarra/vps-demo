@@ -1,0 +1,4 @@
+[2025-10-31 17:27:33] Error getting del. alert settings:Error getting del. alert settings
+Error: Error getting del. alert settings
+    at <anonymous> (C:\Users\User\Desktop\crew\backend\src\server.ts:218:20)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
