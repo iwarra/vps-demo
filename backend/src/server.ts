@@ -7,6 +7,7 @@ import { createClient, type User } from '@supabase/supabase-js';
 import { CreateDeliveryAlertSettings } from './alertSettingsLogic.ts';
 import { AlertScheduler } from './scheduler.ts';
 import { normalizeDeliveryAlertSetting } from './utils/deliveryAlertSetting.ts';
+import { addErrorLog } from '../src/utils/addErrorLog.ts';
 dotenv.config();
 
 //TODO: Implement user checks in all requests (delete needs extra role logic)
@@ -22,7 +23,7 @@ declare global {
 
 export const delAlertSettingsHandler = new CreateDeliveryAlertSettings();
 const cronAlertScheduler = new AlertScheduler();
-cronAlertScheduler.startTest(); //start all jobs when the app is started
+//cronAlertScheduler.startTest(); //start all jobs when the app is started
 //cronAlertScheduler.stopAll();
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -37,25 +38,27 @@ app.use(
 
 app.use(express.json());
 const supabaseAuth = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-async function verifyUser(req: Request, res: Response, next: NextFunction) {
-	const token = req.headers.authorization?.replace('Bearer ', '');
-	if (!token) {
-		return res.status(401).json({ error: 'Missing authorization token' });
-	}
 
+async function verifyUser(req: Request, res: Response, next: NextFunction) {
 	try {
+		const token = req.headers.authorization?.replace('Bearer ', '');
+		if (!token) throw new Error('Missing authorization token');
+
 		const {
 			data: { user },
 			error,
 		} = await supabaseAuth.auth.getUser(token);
 
-		if (error || !user) {
-			return res.status(401).json({ error: 'Invalid or expired token' });
-		}
+		if (error || !user) throw new Error('Invalid or expired user token');
 		req.user = user;
 		next();
-	} catch (err) {
-		console.error(err);
+	} catch (error) {
+		console.error(error);
+		addErrorLog({
+			destination: 'user-verification.log',
+			description: 'verifying the user',
+			error,
+		});
 		res.status(401).json({ error: 'Invalid or expired token' });
 	}
 }
@@ -98,7 +101,7 @@ app.post('/api/delivery-alert-setting/add', verifyUser, async (req: Request, res
 			})
 			.select()
 			.single();
-		if (error) return res.status(400).json({ error: error.message });
+		if (error) throw new Error('Error adding del. alert setting');
 		const normalizedData = normalizeDeliveryAlertSetting(data);
 		console.log(normalizedData);
 		const isAdded = await delAlertSettingsHandler.sortBy(normalizedData, [
@@ -112,12 +115,17 @@ app.post('/api/delivery-alert-setting/add', verifyUser, async (req: Request, res
 		}
 		res.status(201).json({ ok: true });
 	} catch (error) {
+		addErrorLog({
+			destination: 'delivery-alert-settings.log',
+			description: 'adding the del. alert setting',
+			error,
+		});
 		console.error(error);
 		res.status(500).json({ error: 'Server error' });
 	}
 });
 
-app.patch('/api/delivery-alert-setting/:id', async (req: Request, res: Response) => {
+app.patch('/api/delivery-alert-setting/:id', verifyUser, async (req: Request, res: Response) => {
 	try {
 		const { id } = req.params;
 		const payload = req.body;
@@ -127,7 +135,7 @@ app.patch('/api/delivery-alert-setting/:id', async (req: Request, res: Response)
 			.eq('delivery_alert_setting_id', id)
 			.select()
 			.single();
-		if (!data) return res.status(404).json({ error: error.message });
+		if (error) throw new Error(`Error updating del. alert setting: ${id}`);
 		const delAlertSettingId = data.delivery_alert_setting_id;
 		delAlertSettingsHandler.removeAlertFromSystem(delAlertSettingId);
 		const normalizedData = normalizeDeliveryAlertSetting(data);
@@ -140,16 +148,19 @@ app.patch('/api/delivery-alert-setting/:id', async (req: Request, res: Response)
 		if (isActive) {
 			await delAlertSettingsHandler.addToSchedule(delAlertSettingId);
 		}
-
-		if (error) return res.status(400).json({ error });
 		res.json(data);
 	} catch (error) {
+		addErrorLog({
+			destination: 'delivery-alert-settings.log',
+			description: 'updating the del. alert setting',
+			error,
+		});
 		console.error(error);
 		res.status(500).json({ error: 'Server error' });
 	}
 });
 
-app.delete('/api/delivery-alert-setting/:id', async (req: Request, res: Response) => {
+app.delete('/api/delivery-alert-setting/:id', verifyUser, async (req: Request, res: Response) => {
 	try {
 		const { id } = req.params;
 		const { data, error } = await supabase
@@ -157,7 +168,7 @@ app.delete('/api/delivery-alert-setting/:id', async (req: Request, res: Response
 			.update({ status: 'expired', is_deleted: true })
 			.eq('delivery_alert_setting_id', id)
 			.select();
-		if (error) return res.status(400).json({ error: error.message });
+		if (error) throw new Error(`Error deleting del. alert setting: ${id}`);
 
 		if (data.length) {
 			const delAlertSettingId = data[0].delivery_alert_setting_id;
@@ -165,12 +176,17 @@ app.delete('/api/delivery-alert-setting/:id', async (req: Request, res: Response
 		}
 		res.sendStatus(204);
 	} catch (error) {
+		addErrorLog({
+			destination: 'delivery-alert-settings.log',
+			description: 'deleting the del. alert setting',
+			error,
+		});
 		console.error(error);
 		res.status(500).json({ error: 'Server error' });
 	}
 });
 
-app.get('/api/delivery-alert-setting/:id', async (req: Request, res: Response) => {
+app.get('/api/delivery-alert-setting/:id', verifyUser, async (req: Request, res: Response) => {
 	try {
 		const { id } = req.params;
 		const { data, error } = await supabase
@@ -178,9 +194,36 @@ app.get('/api/delivery-alert-setting/:id', async (req: Request, res: Response) =
 			.select('*')
 			.eq('delivery_alert_setting_id', id)
 			.single();
-		if (error) return res.status(400).json({ error: error.message });
+		if (error) throw new Error(`Error getting del. alert setting: ${id}`);
 		return res.status(200).json(data);
 	} catch (error) {
+		addErrorLog({
+			destination: 'delivery-alert-settings.log',
+			description: 'getting the del. alert setting',
+			error,
+		});
+		console.error(error);
+		res.status(500).json({ error: 'Server error' });
+	}
+});
+
+app.get('/api/delivery-alert-settings', verifyUser, async (req: Request, res: Response) => {
+	try {
+		console.log('Fetching settings!');
+		const { data, error } = await supabase
+			.from('delivery_alert_settings')
+			.select(
+				'description, vehicles, type, status, trigger_values, active_hours, active_dates, created_by, delivery_alert_setting_id',
+			);
+		if (error) throw new Error(`Error getting del. alert settings`);
+		console.log(data, data.length);
+		return res.status(200).json(data);
+	} catch (error) {
+		addErrorLog({
+			destination: 'delivery-alert-settings.log',
+			description: 'getting del. alert settings',
+			error,
+		});
 		console.error(error);
 		res.status(500).json({ error: 'Server error' });
 	}
