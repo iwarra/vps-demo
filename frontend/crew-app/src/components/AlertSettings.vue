@@ -854,16 +854,15 @@ function addSelectedCustomerLocations() {
 
 async function handleSubmit() {
 	try {
-		const tokenResponse = await fetch('http://localhost:8080/api/auth/test-login', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-		});
+		const {
+			data: { session },
+		} = await supabase.auth.getSession();
 
-		if (!tokenResponse.ok) {
-			throw new Error('Failed to fetch test login token');
+		if (!session) {
+			throw new Error('Not authorized');
 		}
 
-		const { access_token } = await tokenResponse.json();
+		const access_token = session.access_token;
 		if (!access_token) throw new Error('No access token returned');
 		const formattedReceivers = form.receivers.map((r) => ({
 			receiverName: r.receiverName,
@@ -1007,7 +1006,7 @@ function removeActiveHours(index: number) {
 	padding: 6px;
 	margin-top: 4px;
 	margin-bottom: 8px;
-	border: 1px solid #969595;
+	border: 1px solid var(--border-light);
 	border-radius: 4px;
 }
 
