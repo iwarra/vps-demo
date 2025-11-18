@@ -31,7 +31,7 @@ const PORT = process.env.PORT || 8080;
 app.use(
 	cors({
 		origin: '*',
-		methods: ['GET', 'POST', 'OPTIONS'],
+		methods: ['GET', 'POST', 'PATCH', 'DELETE'],
 		allowedHeaders: ['Content-Type', 'Authorization'],
 	}),
 );
@@ -98,18 +98,17 @@ app.post('/api/delivery-alert-setting/add', verifyUser, async (req: Request, res
 				trigger_values: alertSetting.trigger_values,
 				updated_at: alertSetting.updated_at,
 				is_deleted: alertSetting.is_deleted,
+				created_by: user?.id,
 			})
 			.select()
 			.single();
 		if (error) throw new Error('Error adding del. alert setting');
 		const normalizedData = normalizeDeliveryAlertSetting(data);
-		console.log(normalizedData);
 		const isAdded = await delAlertSettingsHandler.sortBy(normalizedData, [
 			'hasActiveDates',
 			'isActiveToday',
 			'isActiveThisHour',
 		]);
-		console.log(isAdded);
 		if (isAdded) {
 			await delAlertSettingsHandler.addToSchedule(data.delivery_alert_setting_id);
 		}
@@ -165,7 +164,7 @@ app.delete('/api/delivery-alert-setting/:id', verifyUser, async (req: Request, r
 		const { id } = req.params;
 		const { data, error } = await supabase
 			.from('delivery_alert_settings')
-			.update({ status: 'expired', is_deleted: true })
+			.update({ status: 'expired', is_deleted: true, deleted_at: new Date().toISOString() })
 			.eq('delivery_alert_setting_id', id)
 			.select();
 		if (error) throw new Error(`Error deleting del. alert setting: ${id}`);
@@ -209,14 +208,14 @@ app.get('/api/delivery-alert-setting/:id', verifyUser, async (req: Request, res:
 
 app.get('/api/delivery-alert-settings', verifyUser, async (req: Request, res: Response) => {
 	try {
-		console.log('Fetching settings!');
 		const { data, error } = await supabase
 			.from('delivery_alert_settings')
 			.select(
-				'description, vehicles, type, status, trigger_values, active_hours, active_dates, created_by, delivery_alert_setting_id',
-			);
+				'delivery_alert_setting_id, description, vehicles, type, status, trigger_values, active_hours, active_dates, created_by, delivery_alert_setting_id',
+			)
+			.filter('is_deleted', 'is', null);
 		if (error) throw new Error(`Error getting del. alert settings`);
-		console.log(data, data.length);
+
 		return res.status(200).json(data);
 	} catch (error) {
 		addErrorLog({
