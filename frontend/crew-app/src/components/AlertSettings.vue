@@ -1,11 +1,18 @@
 <template>
-	<div>
+	<template v-if="isLoading">Loading...</template>
+	<div
+		v-else
+		class="flex flex-col items-center gap-6 mt-8 mb-6">
 		<h1>Alert Settings</h1>
 
-		<div>
+		<div class="flex flex-col gap-4">
 			<!-- description -->
 			<div style="display: block">
-				<label for="description">Description: </label>
+				<label
+					for="description"
+					class="mr-2"
+					>Description:
+				</label>
 				<input
 					type="text"
 					id="description"
@@ -14,53 +21,53 @@
 			</div>
 
 			<!-- alert type - multiple select -->
-			<div style="display: block; margin-top: 1rem">
+			<div class="flex flex-col gap-1">
 				<label for="alertType">Alert type: </label>
-				<label
-					>Temperature
+				<label>
 					<input
 						name="alertType"
 						type="radio"
 						v-model="form.alertType"
-						value="temperature"
-				/></label>
-				<label
-					>Delivery delay
+						value="temperature" />Temperature</label
+				>
+				<label>
 					<input
 						name="alertType"
 						type="radio"
 						v-model="form.alertType"
-						value="delay"
-				/></label>
-				<label
-					>Speed
+						value="delay" />Delivery delay</label
+				>
+				<label>
 					<input
 						name="alertType"
 						type="radio"
 						v-model="form.alertType"
-						value="speed"
-				/></label>
-				<label
-					>Out of range
+						value="speed" />Speed</label
+				>
+				<label>
 					<input
 						name="alertType"
 						type="radio"
 						v-model="form.alertType"
-						value="out of range"
-				/></label>
+						value="out of range" />Out of range</label
+				>
 			</div>
 
 			<!-- Conditional inputs -->
-			<div v-if="form.alertType === 'temperature'">
+			<div
+				v-if="form.alertType === 'temperature'"
+				class="flex flex-col">
 				<label>
 					Min Temperature:
 					<input
+						class="ml-2"
 						type="number"
 						v-model.number="form.tempMin" />
 				</label>
 				<label>
 					Max Temperature:
 					<input
+						class="ml-2"
 						type="number"
 						v-model.number="form.tempMax" />
 				</label>
@@ -70,13 +77,14 @@
 				<label>
 					Delay Minutes:
 					<input
+						class="ml-2"
 						type="number"
 						v-model.number="form.delayMinutes" />
 				</label>
 			</div>
 
 			<!-- tracking - dropdown with vehicles, bookings,... -->
-			<div style="display: block; margin-top: 1rem">
+			<div>
 				<label
 					for="tracking"
 					disabled
@@ -85,6 +93,7 @@
 				<select
 					id="tracking"
 					v-model="form.tracking"
+					class="ml-2"
 					@change="() => getVehicles()">
 					<option
 						value="placeholder"
@@ -118,15 +127,14 @@
 			</div>
 
 			<!-- Dynamic dropdown for the fetched list (vehicles atm) -->
-			<div
-				v-if="vehiclesList.length > 0"
-				style="margin-top: 1rem">
+			<div v-if="vehiclesList.length > 0">
 				<label :for="form.tracking + '-list'"> Select {{ form.tracking }}: </label>
 				<select
 					:id="form.tracking + '-list'"
 					v-model="form.selectedTrackingItems"
 					required
-					multiple>
+					multiple
+					class="ml-2">
 					<option
 						v-for="opt in vehiclesList"
 						:key="opt.id"
@@ -137,12 +145,12 @@
 			</div>
 
 			<!-- Date ranges -->
-			<div style="margin-top: 1rem">
+			<div class="space-y-2">
 				<label>Date ranges:</label>
 				<div
 					v-for="(range, index) in form.dateRanges"
 					:key="index"
-					style="margin-bottom: 0.5rem">
+					class="space-x-2">
 					From:
 					<input
 						type="date"
@@ -170,22 +178,26 @@
 			</div>
 
 			<!-- Active hours -->
-			<div style="margin-top: 1rem">
+			<div class="space-y-2">
 				<label>Active alert hours:</label>
 				<div
 					v-for="(hours, index) in form.activeHours"
 					:key="index"
-					style="margin-bottom: 0.5rem">
+					class="space-x-2">
+					From:
 					<input
 						type="time"
 						v-model="hours.from"
+						step="3600"
 						required />
-					to
+					To:
 					<input
 						type="time"
 						v-model="hours.to"
+						step="3600"
 						required />
 					<button
+						class="ml-2"
 						v-if="form.activeHours.length > 1"
 						type="button"
 						@click="removeActiveHours(index)">
@@ -203,6 +215,7 @@
 			<div style="display: block; margin-top: 1rem">
 				<label>Interval range: </label>
 				<input
+					class="ml-2"
 					type="number"
 					min="1"
 					v-model="form.interval"
@@ -210,7 +223,7 @@
 			</div>
 
 			<!-- Receivers - create new or choose from existing -->
-			<div style="margin-top: 1rem">
+			<div class="space-x-4">
 				<label>
 					<input
 						type="radio"
@@ -227,9 +240,7 @@
 				</label>
 			</div>
 
-			<div
-				v-if="form.receiverOption === 'create'"
-				class="receiver-section">
+			<div v-if="form.receiverOption === 'create'">
 				<!-- Receiver input form -->
 				<div class="receiver-form">
 					<label>
@@ -237,7 +248,8 @@
 						<input
 							type="text"
 							v-model="newReceiver.receiverName"
-							required />
+							required
+							focus />
 					</label>
 
 					<div class="contact-method">
@@ -274,17 +286,15 @@
 
 					<button
 						type="button"
-						class="btn btn-add"
+						class="btn btn-add mt-5"
 						@click="addReceiver">
 						Add Receiver
 					</button>
 				</div>
 			</div>
 
-			<div
-				class="chooser"
-				v-if="form.receiverOption === 'choose'">
-				<div class="mode-switch">
+			<div v-if="form.receiverOption === 'choose'">
+				<div>
 					<button
 						:class="['tab', mode === 'drivers' ? 'active' : '']"
 						@click="
@@ -307,14 +317,12 @@
 					</button>
 				</div>
 
-				<div
-					v-if="mode === 'drivers'"
-					class="list">
-					<h4>Drivers</h4>
+				<div v-if="mode === 'drivers'">
+					<h4 class="mt-3 mb-3">Drivers</h4>
 					<div
 						v-for="d in drivers"
 						:key="d.id"
-						class="list-item">
+						class="list-row">
 						<details class="details">
 							<summary>{{ d.displayName }} contacts</summary>
 							<div class="contact-options">
@@ -351,12 +359,10 @@
 						</details>
 					</div>
 				</div>
-				<div
-					v-if="mode === 'drivers'"
-					class="actions">
+				<div v-if="mode === 'drivers'">
 					<button
 						type="button"
-						class="btn btn-add"
+						class="btn btn-add mt-5"
 						@click="addSelectedDrivers">
 						Add selected to list
 					</button>
@@ -365,12 +371,12 @@
 				<!-- customers part-->
 				<div
 					v-if="mode === 'customers'"
-					class="list">
-					<h4>Customers</h4>
+					class="space-y-4">
+					<h4 class="mt-3 mb-3">Customers</h4>
 					<div
 						v-for="c in customers"
 						:key="c.id"
-						class="customer list-item">
+						class="list-row">
 						<details @click="getCustomerLocations(c.id)">
 							<summary class="cust-summary">
 								{{ c.name }}
@@ -381,7 +387,7 @@
 								<li
 									v-for="loc in customerLocations[c.id]"
 									:key="loc.id"
-									style="list-style: none; margin-bottom: 0.5rem">
+									style="list-style: none">
 									<details>
 										<summary>{{ loc.name }} ({{ loc.contactPerson }})</summary>
 
@@ -426,7 +432,7 @@
 					</div>
 					<button
 						type="button"
-						class="btn btn-add"
+						class="btn btn-add mt-5"
 						@click="addSelectedCustomerLocations">
 						Add selected locations
 					</button>
@@ -441,13 +447,13 @@
 					v-for="(receiver, i) in form.receivers"
 					:key="i"
 					class="receiver-item">
-					<div v-if="editingIndex !== i">
+					<div
+						v-if="editingIndex !== i"
+						class="flex flex-col gap-3">
 						<strong>{{ receiver.receiverName }}</strong>
 						<div v-if="receiver.contactSms">📱 {{ receiver.phoneNumber }}</div>
 						<div v-if="receiver.contactEmail">✉️ {{ receiver.email }}</div>
-						<div
-							class="actions"
-							style="margin-top: 1rem">
+						<div class="space-x-3">
 							<button
 								type="button"
 								class="btn btn-edit"
@@ -471,7 +477,8 @@
 							<input
 								required
 								type="text"
-								v-model="editForm.receiverName" />
+								v-model="editForm.receiverName"
+								class="ml-1" />
 						</label>
 
 						<label>
@@ -480,6 +487,7 @@
 								type="tel"
 								v-model="editForm.phoneNumber" />
 							<input
+								class="ml-1"
 								type="checkbox"
 								v-model="editForm.contactSms" />
 							Use SMS
@@ -491,14 +499,13 @@
 								type="email"
 								v-model="editForm.email" />
 							<input
+								class="ml-1"
 								type="checkbox"
 								v-model="editForm.contactEmail" />
 							Use Email
 						</label>
 
-						<div
-							class="actions"
-							style="margin-top: 1rem">
+						<div class="space-x-3">
 							<button
 								class="btn btn-add"
 								type="button"
@@ -516,19 +523,18 @@
 				</div>
 			</div>
 
-			<div style="display: block; margin-top: 1rem"></div>
 			<button
 				@click="handleSubmit"
 				type="button"
 				style="margin-top: 1rem">
-				Add alert
+				{{ pageMode === 'edit' ? 'Save Changes' : 'Add alert' }}
 			</button>
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { supabase } from '../supabase';
 import type {
 	Driver,
@@ -538,6 +544,15 @@ import type {
 	Receiver,
 	Selection,
 } from '../../types';
+import { useRoute } from 'vue-router';
+import { authenticateUser } from '@/lib/helpers';
+import { DeliveryAlertSettingsFormSchema, type DeliveryAlertSettingsForm } from '../data/schema.ts';
+import { onBeforeRouteLeave } from 'vue-router';
+
+onBeforeRouteLeave(() => {
+	clearCache();
+});
+
 const today = new Date().toISOString().split('T')[0];
 //Tracks the selected receivers
 const selections = reactive<Record<string, Selection>>({});
@@ -549,7 +564,13 @@ const customerLocations = ref<Record<string, CustomerLocation[]>>({});
 const loadingLocations = ref<Record<string, boolean>>({});
 let vehiclesList = ref<VehicleInfo[]>([]);
 const mode = ref<'drivers' | 'customers'>('drivers');
-
+const route = useRoute();
+const pageMode = computed(() => {
+	if (route.path.endsWith('/edit')) return 'edit';
+	if (route.path.endsWith('/copy')) return 'copy';
+	if (route.path.endsWith('/new')) return 'new';
+	return 'view';
+});
 const initialForm = {
 	description: '',
 	alertType: '', //can be only one
@@ -565,8 +586,72 @@ const initialForm = {
 	delayMinutes: null as number | null,
 };
 
-const form = reactive({
-	...initialForm,
+let form = reactive({ ...initialForm });
+
+const isLoading = ref(false);
+const id = route.params.id as string | undefined;
+
+const newReceiver = reactive<Receiver>({
+	receiverName: '',
+	phoneNumber: '',
+	email: '',
+	origin: 'custom',
+	contactEmail: false,
+	contactSms: false,
+});
+
+// Temporary edit form (separate from the main list)
+const editForm = reactive<Receiver>({
+	receiverName: '',
+	phoneNumber: '',
+	email: '',
+	origin: undefined,
+	originId: undefined,
+	contactSms: false,
+	contactEmail: false,
+});
+
+onMounted(async () => {
+	if ((pageMode.value === 'edit' || pageMode.value === 'copy') && id) {
+		// Fetch existing alert setting by ID and populate form
+		try {
+			const { isAuthenticated, access_token } = await authenticateUser();
+			if (!isAuthenticated || !access_token) return;
+			isLoading.value = true;
+			const response = await fetch(`http://localhost:8080/api/delivery-alert-setting/${id}`, {
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${access_token}`,
+				},
+			});
+			const data = await response.json();
+			console.log('Fetched alert setting data:', data);
+			form.description = data.description;
+			form.alertType = data.type;
+			form.tracking = 'vehicles';
+			form.interval = data.alert_interval_minutes;
+			form.receivers = data.receivers.map((r: any) => ({
+				receiverName: r.receiverName,
+				phoneNumber: r.phoneNumber || '',
+				email: r.email || '',
+				origin: r.origin || 'custom',
+				originId: r.originId || null,
+				contactSms: !!r.phoneNumber,
+				contactEmail: !!r.email,
+			}));
+			form.tempMin = data.trigger_values.min || null;
+			form.tempMax = data.trigger_values.max || null;
+			form.selectedTrackingItems = data.vehicles;
+			vehiclesList.value = await getVehicles();
+			form.activeHours = data.active_hours.length ? data.active_hours : [{ from: '', to: '' }];
+			form.dateRanges = data.active_dates.length ? data.active_dates : [{ from: '', to: '' }];
+		} catch (error) {
+			console.error('Error fetching alert setting for edit:', error);
+		} finally {
+			isLoading.value = false;
+		}
+	}
 });
 
 function resetForm() {
@@ -583,25 +668,6 @@ function resetForm() {
 	form.tempMax = null;
 	form.delayMinutes = null;
 }
-
-const newReceiver = reactive<Receiver>({
-	receiverName: '',
-	phoneNumber: '',
-	email: '',
-	origin: 'custom',
-	contactEmail: false,
-	contactSms: false,
-});
-// Temporary edit form (separate from the main list)
-const editForm = reactive<Receiver>({
-	receiverName: '',
-	phoneNumber: '',
-	email: '',
-	origin: undefined,
-	originId: undefined,
-	contactSms: false,
-	contactEmail: false,
-});
 
 function editReceiver(index: number) {
 	editingIndex.value = index;
@@ -696,8 +762,7 @@ async function getDrivers(forceRefresh = false) {
 			phoneNumber: d.contact_phone_number || '',
 			email: d.contact_email || '',
 			displayName:
-				(d.drivers_user_id_fkey as unknown as { display_name: string }[])[0]?.display_name ||
-				'No Name',
+				(d.drivers_user_id_fkey as unknown as { display_name: string })?.display_name || 'No Name',
 		}));
 
 		localStorage.setItem(CACHE_KEY, JSON.stringify({ data: mapped, timestamp: Date.now() }));
@@ -854,16 +919,13 @@ function addSelectedCustomerLocations() {
 
 async function handleSubmit() {
 	try {
-		const {
-			data: { session },
-		} = await supabase.auth.getSession();
+		const { isAuthenticated, access_token } = await authenticateUser();
+		if (!isAuthenticated || !access_token) return;
 
-		if (!session) {
-			throw new Error('Not authorized');
-		}
+		const result = DeliveryAlertSettingsFormSchema.safeParse(form);
+		console.log('Form data to validate:', form);
+		console.log('Validation result:', result);
 
-		const access_token = session.access_token;
-		if (!access_token) throw new Error('No access token returned');
 		const formattedReceivers = form.receivers.map((r) => ({
 			receiverName: r.receiverName,
 			phoneNumber: r.phoneNumber || null,
@@ -877,34 +939,71 @@ async function handleSubmit() {
 				? { min: form.tempMin ?? undefined, max: form.tempMax ?? undefined }
 				: { delayMinutes: form.delayMinutes! };
 
-		const alertSettingToAdd = {
-			description: form.description,
-			vehicles: form.selectedTrackingItems,
-			type: form.alertType,
-			active_hours: form.activeHours,
-			receivers: formattedReceivers,
-			active_dates: form.dateRanges,
-			alert_interval_minutes: form.interval,
-			trigger_values: triggerValues,
-			status: 'active',
-			created_at: null,
-			updated_at: null,
-			is_deleted: null,
-		};
-		const response = await fetch('http://localhost:8080/api/delivery-alert-setting/add', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${access_token}`,
-			},
-			body: JSON.stringify(alertSettingToAdd),
-		});
-		console.log(response);
+		if (pageMode.value === 'edit' && id) {
+			const alertSettingToUpdate = {
+				description: form.description,
+				vehicles: form.selectedTrackingItems,
+				type: form.alertType,
+				active_hours: form.activeHours,
+				receivers: formattedReceivers,
+				active_dates: form.dateRanges,
+				alert_interval_minutes: form.interval,
+				trigger_values: triggerValues,
+				status: 'active',
+				updated_at: new Date().toISOString(),
+				is_deleted: null,
+			};
+			const response = await fetch(`http://localhost:8080/api/delivery-alert-setting/${id}`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${access_token}`,
+				},
+				body: JSON.stringify(alertSettingToUpdate),
+			});
+			console.log(response);
+		} else {
+			const alertSettingToAdd = {
+				description: form.description,
+				vehicles: form.selectedTrackingItems,
+				type: form.alertType,
+				active_hours: form.activeHours,
+				receivers: formattedReceivers,
+				active_dates: form.dateRanges,
+				alert_interval_minutes: form.interval,
+				trigger_values: triggerValues,
+				status: 'active',
+				created_at: null,
+				updated_at: null,
+				is_deleted: null,
+			};
+			const response = await fetch('http://localhost:8080/api/delivery-alert-setting/add', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${access_token}`,
+				},
+				body: JSON.stringify(alertSettingToAdd),
+			});
+			console.log(response);
+		}
 		//Reset form after successful submission
 		resetForm();
 	} catch (error) {
 		console.error('Error submitting form:', error);
 	}
+}
+
+function clearCache() {
+	localStorage.removeItem('vehicles_cache');
+	localStorage.removeItem('drivers_cache');
+	localStorage.removeItem('customers_cache');
+	// Remove all customer location caches
+	Object.keys(localStorage).forEach((key) => {
+		if (key.startsWith('customer_locations_')) {
+			localStorage.removeItem(key);
+		}
+	});
 }
 
 function ensureSelection(
@@ -979,14 +1078,9 @@ function removeActiveHours(index: number) {
 </script>
 
 <style lang="css" scoped>
-.receiver-section {
-	margin-top: 1rem;
-}
-
 .receiver-form {
 	padding: 1rem;
 	border-radius: 6px;
-	margin-bottom: 1rem;
 }
 
 .receiver-form label {
@@ -994,20 +1088,10 @@ function removeActiveHours(index: number) {
 	margin-bottom: 0.5rem;
 }
 
-.edit-form label {
-	display: block;
-	margin-bottom: 0.6rem;
-}
-
-.receiver-form input[type='text'],
-.receiver-form input[type='tel'],
-.receiver-form input[type='email'] {
-	width: 100%;
-	padding: 6px;
-	margin-top: 4px;
-	margin-bottom: 8px;
-	border: 1px solid var(--border-light);
-	border-radius: 4px;
+.edit-form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
 }
 
 .contact-method {
@@ -1025,10 +1109,6 @@ function removeActiveHours(index: number) {
 	border: 1px solid #ddd;
 	border-radius: 6px;
 	padding: 0.75rem;
-}
-
-.actions button {
-	margin-left: 0.5rem;
 }
 
 .save-section {
@@ -1067,14 +1147,6 @@ function removeActiveHours(index: number) {
 	opacity: 0.9;
 }
 
-.chooser {
-	margin-top: 1rem;
-	padding: 12px;
-	border-radius: 6px;
-}
-.mode-switch {
-	margin-bottom: 8px;
-}
 .tab {
 	padding: 6px 10px;
 	margin-right: 6px;
@@ -1086,13 +1158,11 @@ function removeActiveHours(index: number) {
 	background: #007bff;
 	color: white;
 }
-.list {
-	margin-top: 6px;
-}
-.list-item,
+
+.list-row,
 .location-item {
 	padding: 8px;
-	border: 1px solid #e9e9e9;
+	border: 1px solid #b8b8b8;
 	border-radius: 6px;
 	margin-bottom: 8px;
 }
@@ -1115,11 +1185,7 @@ function removeActiveHours(index: number) {
 .cust-summary {
 	font-weight: 700;
 }
-.chooser-actions {
-	margin-top: 10px;
-	display: flex;
-	gap: 8px;
-}
+
 .btn {
 	padding: 6px 10px;
 	border-radius: 6px;
