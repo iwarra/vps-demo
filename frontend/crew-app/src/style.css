@@ -165,7 +165,8 @@ h1 {
 button {
 	border-radius: 8px;
 	border: 1px solid transparent;
-	padding: 0.6em 1.2em;
+	/* padding: 0.6em 1.2em; */
+	padding: 6px 12px;
 	font-size: 1em;
 	font-weight: 500;
 	font-family: inherit;
@@ -182,6 +183,24 @@ button:focus-visible {
 	outline: 4px auto -webkit-focus-ring-color;
 }
 
+input,
+select {
+	padding: 6px;
+	margin-top: 4px;
+	margin-bottom: 8px;
+	border: 1px solid #969595;
+	border-radius: 4px;
+}
+
+ul {
+	list-style: none;
+}
+
+select {
+	background-color: #1a1a1a;
+	color: #eee;
+}
+
 .card {
 	padding: 2em;
 }
@@ -190,7 +209,22 @@ button:focus-visible {
 	max-width: 1280px;
 	margin: 0 auto;
 	padding: 2rem;
-	text-align: center;
+	width: 100%;
+}
+
+.btn-add {
+	background-color: #39618c;
+	color: #fff;
+}
+
+.btn-edit {
+	background-color: #d1af49;
+	color: #fff;
+}
+
+.btn-delete {
+	background-color: #7b3038;
+	color: #fff;
 }
 
 @media (prefers-color-scheme: light) {
