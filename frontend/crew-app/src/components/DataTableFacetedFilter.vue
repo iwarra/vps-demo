@@ -1,7 +1,6 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="TData">
 import type { Column } from '@tanstack/vue-table';
 import type { Component } from 'vue';
-import type { Task, DeliveryAlertSetting } from '../data/schema.ts';
 import { computed } from 'vue';
 import { CheckIcon, PlusCircledIcon } from '@radix-icons/vue';
 import { cn } from '@/lib/utils';
@@ -20,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import { Separator } from '../components/ui/separator';
 
 interface DataTableFacetedFilter {
-	column?: Column<DeliveryAlertSetting, any>;
+	column?: Column<TData, any>;
 	title?: string;
 	options: {
 		label: string;

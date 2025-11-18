@@ -1,6 +1,5 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="TData">
 import type { Column } from '@tanstack/vue-table';
-import type { DeliveryAlertSetting } from '../data/schema.ts';
 import { ArrowDownIcon, ArrowUpIcon, CaretSortIcon, EyeNoneIcon } from '@radix-icons/vue';
 import { cn } from '@/lib/utils';
 import { Button } from '../components/ui/button';
@@ -13,7 +12,7 @@ import {
 } from '../components/ui/dropdown-menu';
 
 interface DataTableColumnHeaderProps {
-	column: Column<DeliveryAlertSetting, any>;
+	column: Column<TData, any>;
 	title: string;
 }
 

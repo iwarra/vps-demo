@@ -1,6 +1,5 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="TData">
 import type { Table } from '@tanstack/vue-table';
-import type { Task, DeliveryAlertSetting } from '../data/schema.ts';
 import { computed } from 'vue';
 import { MixerHorizontalIcon } from '@radix-icons/vue';
 
@@ -15,7 +14,7 @@ import {
 } from '../components/ui/dropdown-menu';
 
 interface DataTableViewOptionsProps {
-	table: Table<DeliveryAlertSetting>;
+	table: Table<TData>;
 }
 
 const props = defineProps<DataTableViewOptionsProps>();
@@ -33,7 +32,7 @@ const columns = computed(() =>
 			<Button
 				variant="outline"
 				size="sm"
-				class="ml-auto hidden h-8 lg:flex">
+				class="h-8">
 				<MixerHorizontalIcon class="mr-2 h-4 w-4" />
 				View
 			</Button>

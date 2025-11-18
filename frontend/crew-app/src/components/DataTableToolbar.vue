@@ -1,33 +1,46 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="TData">
 import type { Table } from '@tanstack/vue-table';
-import type { Task, DeliveryAlertSetting } from '../data/schema.ts';
 import { computed } from 'vue';
-
 import { Cross2Icon } from '@radix-icons/vue';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-
-import { priorities, myStatuses, deliveryAlertTypes } from '../data/data.ts';
+import { myStatuses, deliveryAlertTypes } from '../data/data.ts';
 import DataTableFacetedFilter from './DataTableFacetedFilter.vue';
 import DataTableViewOptions from './DataTableViewOptions.vue';
 
 interface DataTableToolbarProps {
-	table: Table<DeliveryAlertSetting>;
+	table: Table<TData>;
 }
 
 const props = defineProps<DataTableToolbarProps>();
-
+const creatorColumn = props.table.getColumn('created_by');
+const vehicleColumn = props.table.getColumn('vehicles');
 const isFiltered = computed(() => props.table.getState().columnFilters.length > 0);
+
+const vehicleOptions = computed(
+	() =>
+		[...vehicleColumn.getFacetedUniqueValues().keys()]
+			.flatMap((value) => value) // flatten arrays
+			.filter((v, i, arr) => arr.indexOf(v) === i) // remove duplicates
+			.sort()
+			.map((v) => ({ label: v, value: v })), // <-- this is what your filter component expects
+);
+
+const creatorOptions = computed(() =>
+	[...creatorColumn.getFacetedUniqueValues().keys()].sort().map((v) => ({ label: v, value: v })),
+);
 </script>
 
 <template>
-	<div class="flex items-center justify-between">
-		<div class="flex flex-1 items-center space-x-2">
-			<Input
-				placeholder="Filter alerts..."
-				:model-value="(table.getColumn('description')?.getFilterValue() as string) ?? ''"
-				class="h-8 w-[150px] lg:w-[250px]"
-				@input="table.getColumn('description')?.setFilterValue($event.target.value)" />
+	<div class="flex flex-1 flex-col sm:flex-row flex-wrap gap-3 items-start">
+		<Input
+			placeholder="Filter alerts..."
+			:model-value="(table.getColumn('description')?.getFilterValue() as string) ?? ''"
+			class="h-8 w-[150px] lg:w-[250px]"
+			@input="table.getColumn('description')?.setFilterValue($event.target.value)" />
+		<DataTableViewOptions :table="table" />
+		<div
+			class="flex flex-1 flex-col sm:flex-row flex-wrap gap-3 place-content-center sm:place-content-end">
 			<DataTableFacetedFilter
 				v-if="table.getColumn('status')"
 				:column="table.getColumn('status')"
@@ -37,7 +50,7 @@ const isFiltered = computed(() => props.table.getState().columnFilters.length > 
 				v-if="table.getColumn('created_by')"
 				:column="table.getColumn('created_by')"
 				title="Created by"
-				:options="priorities" />
+				:options="creatorOptions" />
 			<DataTableFacetedFilter
 				v-if="table.getColumn('type')"
 				:column="table.getColumn('type')"
@@ -47,7 +60,7 @@ const isFiltered = computed(() => props.table.getState().columnFilters.length > 
 				v-if="table.getColumn('vehicles')"
 				:column="table.getColumn('vehicles')"
 				title="Vehicle"
-				:options="priorities" />
+				:options="vehicleOptions" />
 
 			<Button
 				v-if="isFiltered"
@@ -58,6 +71,5 @@ const isFiltered = computed(() => props.table.getState().columnFilters.length > 
 				<Cross2Icon class="ml-2 h-4 w-4" />
 			</Button>
 		</div>
-		<DataTableViewOptions :table="table" />
 	</div>
 </template>
