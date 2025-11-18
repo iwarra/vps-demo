@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { columns } from '../components/newColumns.ts';
+import { columns } from './delAlertSettingColumns.ts';
 import type { ColumnFiltersState, SortingState, VisibilityState } from '@tanstack/vue-table';
 import {
 	FlexRender,
@@ -11,7 +11,7 @@ import {
 	getSortedRowModel,
 	useVueTable,
 } from '@tanstack/vue-table';
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { valueUpdater } from '../lib/utils.ts';
 import {
 	Table,
@@ -24,43 +24,75 @@ import {
 import DataTablePagination from './DataTablePagination.vue';
 import DataTableToolbar from './DataTableToolbar.vue';
 import { supabase } from '../supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { authenticateUser, setupRealtimeSubscription } from '../lib/helpers.ts';
 
 const data = ref<Array<any>>([]); //fetched data will go here
+const isLoading = ref(true);
+let realtimeChannel: RealtimeChannel | null = null;
 
 async function getDeliveryAlertSettings() {
 	try {
-		const {
-			data: { session },
-		} = await supabase.auth.getSession();
+		const { isAuthenticated } = await authenticateUser();
+		if (!isAuthenticated) return;
 
-		if (!session) {
-			throw new Error('Not authorized');
+		const response = await supabase
+			.from('delivery_alert_settings')
+			.select(
+				'delivery_alert_setting_id, description, vehicles, type, status, trigger_values, active_hours, active_dates, created_by, delivery_alert_setting_id',
+			)
+			.filter('is_deleted', 'is', null);
+		if (response.error) {
+			throw response.error;
 		}
-
-		const access_token = session.access_token;
-		if (!access_token) throw new Error('No access token returned');
-		const response = await fetch('http://localhost:8080/api/delivery-alert-settings', {
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${access_token}`,
-			},
-		});
-		// if (!response.ok) {
-		// 	const errorText = await response.text();
-		// 	throw new Error(`API error: ${response.status} ${errorText}`);
-		// }
-
-		const result = await response.json();
-		console.log('Delivery alert settings:', result);
-		data.value = result;
+		console.log('Delivery alert settings:', response.data);
+		data.value = response.data;
 	} catch (error) {
 		console.error('getDeliveryAlertSettings error:', error);
+	} finally {
+		isLoading.value = false;
 	}
 }
+
+function handleRealtimeChange(payload: any) {
+	const { eventType, new: newRecord, old: oldRecord } = payload;
+
+	switch (eventType) {
+		case 'INSERT':
+			data.value = [...data.value, newRecord];
+			break;
+
+		case 'UPDATE':
+			// If updated record is marked as deleted, remove it
+			if (newRecord.is_deleted) {
+				data.value = data.value.filter(
+					(item) => item.delivery_alert_setting_id !== newRecord.delivery_alert_setting_id,
+				);
+			} else {
+				data.value = data.value.map((item) =>
+					item.delivery_alert_setting_id === newRecord.delivery_alert_setting_id ? newRecord : item,
+				);
+			}
+			break;
+
+		case 'DELETE':
+			data.value = data.value.filter(
+				(item) => item.delivery_alert_setting_id !== oldRecord.delivery_alert_setting_id,
+			);
+			break;
+	}
+}
+
 onMounted(async () => {
-	console.log('Mounted!');
 	await getDeliveryAlertSettings();
+	realtimeChannel = setupRealtimeSubscription('delivery_alert_settings', handleRealtimeChange);
+});
+
+onUnmounted(() => {
+	if (realtimeChannel) {
+		supabase.removeChannel(realtimeChannel);
+		console.log('Unsubscribed from delivery_alert_settings changes');
+	}
 });
 
 const sorting = ref<SortingState>([]);
@@ -105,15 +137,18 @@ const table = useVueTable({
 </script>
 
 <template>
-	<div class="h-full flex-1 flex-col space-y-8 p-8 md:flex">
+	<div class="h-full flex-1 flex-col space-y-8 py-8 md:flex">
 		<div class="flex items-center justify-between space-y-2">
 			<div>
 				<h2 class="text-2xl font-bold tracking-tight">Welcome back!</h2>
-				<p class="text-muted-foreground">Here's a list of your tasks for this month!</p>
+				<p class="text-muted-foreground">Here's a list of your delivery alert settings!</p>
 			</div>
 			<div class="flex items-center space-x-2"></div>
 		</div>
-		<div class="space-y-4">
+		<template v-if="isLoading">Loading...</template>
+		<div
+			v-else
+			class="space-y-4">
 			<DataTableToolbar :table="table" />
 			<div class="rounded-md border">
 				<Table>
@@ -157,7 +192,6 @@ const table = useVueTable({
 					</TableBody>
 				</Table>
 			</div>
-
 			<DataTablePagination :table="table" />
 		</div>
 	</div>
