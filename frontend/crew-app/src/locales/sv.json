@@ -1,0 +1,44 @@
+{
+	"greeting": "Hej världen!",
+	"welcome_message": "Välkommen till Crew App",
+	"app_page": {
+		"router_link_1": "Hemsida",
+		"router_link_2": "Login",
+		"router_link_3": "Vue Tabell",
+		"router_link_4": "Aviseringsinställningar"
+	},
+	"login_page": {
+		"title": "Välkommen tillbaka!",
+		"subtitle": "Logga in på ditt konto",
+		"email": "E-post",
+		"email_error": "Ange en giltig e-postadress",
+		"password": "Lösenord",
+		"password_error": "Lösenordet måste vara minst 6 tecken långt och innehålla minst en versal bokstav",
+		"login_button": "Logga in",
+		"logout_button": "Logga ut",
+		"logout_title": "Tråkigt att se dig lämna. Klicka nedan för att logga ut."
+	},
+	"customer_table": {
+		"name": "Namn",
+		"address": "Adress",
+		"org_number": "Org. nummer",
+		"user": "Användare"
+	},
+	"del_alert_settings_table": {
+		"description": "Beskrivning",
+		"type": "Typ",
+		"vehicles": "Fordon",
+		"status": "Status",
+		"recipients": "Mottagare",
+		"active_dates": "Aktiva datum",
+		"active_hours": "Aktiva timmar",
+		"trigger_values": "Utlösarvärden",
+		"created_by": "Skapad av"
+	},
+	"table_row_actions": {
+		"view_more": "Se mer",
+		"edit": "Redigera",
+		"copy": "Kopiera",
+		"delete": "Radera"
+	}
+}

@@ -1,0 +1,44 @@
+{
+	"greeting": "Hello World!",
+	"welcome_message": "Welcome to the Crew App!",
+	"app_page": {
+		"router_link_1": "Home page",
+		"router_link_2": "Login",
+		"router_link_3": "Default table",
+		"router_link_4": "Alert Settings"
+	},
+	"login_page": {
+		"title": "Welcome back!",
+		"subtitle": "Sign in to your account",
+		"email": "Email",
+		"email_error": "Please enter a valid email address",
+		"password": "Password",
+		"password_error": "Password must be at least 6 characters and must contain at least one uppercase letter",
+		"login_button": "Login",
+		"logout_button": "Logout",
+		"logout_title": "Sad to see you leave. Click below to log out."
+	},
+	"customer_table": {
+		"name": "Name",
+		"address": "Address",
+		"org_number": "Org. number",
+		"user": "User"
+	},
+	"del_alert_settings_table": {
+		"description": "Description",
+		"type": "Type",
+		"vehicles": "Vehicles",
+		"status": "Status",
+		"recipients": "Recipients",
+		"active_dates": "Active Dates",
+		"active_hours": "Active Hours",
+		"trigger_values": "Trigger Values",
+		"created_by": "Created By"
+	},
+	"table_row_actions": {
+		"view_more": "See more",
+		"edit": "Edit",
+		"copy": "Copy",
+		"delete": "Delete"
+	}
+}
